@@ -519,23 +519,43 @@ If you use Chameleon in your research, please cite:
 }
 ```
 
-## 🗺️ Roadmap
+## 🗺️ Future Ideas & Improvements
 
-### Version 2.0 (Planned)
+### 🚀 LLM Expansion
+- [ ] **Multi-Provider Support**: Anthropic Claude, Google Gemini, Cohere, Llama
+- [ ] **Model Comparison**: Side-by-side robustness analysis across different LLMs
+- [ ] **API Standardization**: Unified interface for testing any language model
+- [ ] **Local Model Support**: Integration with Ollama, Hugging Face Transformers
 
-- [ ] Support for additional LLM providers (Anthropic, Cohere)
-- [ ] Advanced distortion techniques (semantic, syntactic)
-- [ ] Real-time processing capabilities
-- [ ] Web-based dashboard and monitoring
-- [ ] Integration with popular ML experiment tracking tools
+### 🎯 Advanced Distortion Techniques
+- [ ] **Semantic Distortions**: Meaning-preserving paraphrasing attacks
+- [ ] **Syntactic Variations**: Grammar and sentence structure modifications
+- [ ] **Adversarial Prompting**: Injection and jailbreaking resistance testing
+- [ ] **Cultural/Linguistic Bias**: Cross-language and cultural sensitivity analysis
 
-### Version 2.1 (Future)
+### 🖼️ Multi-Modal Capabilities
+- [ ] **Vision-Language Models**: Test robustness of GPT-4V, Claude Vision, etc.
+- [ ] **Image Distortions**: Visual noise, compression, style transfer effects
+- [ ] **Mathematical Notation**: LaTeX equation parsing and distortion
+- [ ] **Audio Processing**: Speech-to-text robustness analysis
 
-- [ ] Automated hyperparameter optimization
-- [ ] Multi-modal question support (images, equations)
-- [ ] Distributed processing across multiple nodes
-- [ ] Custom evaluation metrics framework
-- [ ] Integration with educational platforms
+### 🏗️ Infrastructure & Scaling
+- [ ] **Real-Time Processing**: Live distortion testing and monitoring
+- [ ] **Distributed Computing**: Multi-node processing for large-scale studies
+- [ ] **Cloud Integration**: AWS, GCP, Azure deployment templates
+- [ ] **Auto-Scaling**: Dynamic resource allocation based on workload
+
+### 📊 Enhanced Analytics
+- [ ] **Interactive Dashboards**: Web-based visualization and exploration
+- [ ] **Statistical Significance**: Bayesian analysis and confidence intervals
+- [ ] **Causal Analysis**: Understanding why certain distortions affect performance
+- [ ] **Benchmark Suite**: Standardized robustness testing protocols
+
+### 🔬 Research Applications
+- [ ] **Educational Assessment**: Integration with learning management systems
+- [ ] **Medical AI Safety**: Healthcare-specific robustness testing
+- [ ] **Legal AI Compliance**: Regulatory and bias testing frameworks
+- [ ] **Experiment Tracking**: MLflow, Weights & Biases integration
 
 ---
 
