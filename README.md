@@ -534,7 +534,7 @@ If you use Chameleon in your research, please cite:
 - [ ] **Cultural/Linguistic Bias**: Cross-language and cultural sensitivity analysis
 
 ### 🖼️ Multi-Modal Capabilities
-- [ ] **Vision-Language Models**: Test robustness of GPT-4V, Claude Vision, etc.
+- [ ] **Vision-Language Models**: Test robustness of GPT, Claude, Gemini, etc.
 - [ ] **Image Distortions**: Visual noise, compression, style transfer effects
 - [ ] **Mathematical Notation**: LaTeX equation parsing and distortion
 - [ ] **Audio Processing**: Speech-to-text robustness analysis
