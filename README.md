@@ -70,7 +70,15 @@ Chameleon/
 │   ├── results/                 # GPT-5 responses
 │   └── metadata/                # Processing metadata
 ├── 📁 distortions/
-│   └── comprehensive_distortion_dataset_FINAL_*.csv  # Results
+│   └── chameleon_dataset.csv        # Final results dataset
+├── 📁 analysis_plots/
+│   ├── 1_subject_degradation_ranking.png  # Subject vulnerability ranking
+│   ├── 2_degradation_by_miu_level.png     # μ level impact analysis
+│   ├── 3_degradation_distribution.png     # Degradation distribution
+│   ├── 4_degradation_progression.png      # Progression patterns
+│   ├── 5_subject_resilience_ranking.png   # Resilience ranking
+│   ├── 6_key_distortion_levels_heatmap.png # Key μ levels heatmap
+│   └── enhanced_degradation_heatmap.png   # Complete degradation matrix
 ├── chameleon.py                 # Main orchestration script
 ├── gpt5_manager.py             # GPT-5 batch management
 └── monitor_repair.py           # Monitoring and repair utilities
@@ -141,17 +149,11 @@ python3 gpt5_manager.py monitor --ids batch_123 batch_124
 Comprehensive statistical analysis with multiple dimensions:
 
 ```bash
-# Generate full analysis report
-python3 analysis.py --generate-report
+# Generate all visualizations and analysis
+python3 create_visualizations.py
 
-# Subject-specific analysis
-python3 analysis.py --subject "college_mathematics"
-
-# Distortion-level analysis
-python3 analysis.py --miu 0.5
-
-# Export results
-python3 analysis.py --export-csv --export-plots
+# Clean GPT-5 answers and calculate accuracy
+python3 clean_gpt5_answers.py
 ```
 
 ## 📚 Usage Examples

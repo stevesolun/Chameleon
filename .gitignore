@@ -185,14 +185,15 @@ batches/results/
 !batches/metadata/
 
 # Analysis outputs
-analysis_plots/
 reports/
-*.png
-*.jpg
+# Allow analysis plots in repository
+# *.png
+# *.jpg
 *.pdf
 
-# Distorted datasets
+# Distorted datasets - allow main dataset
 distortions/*.csv
+!distortions/chameleon_dataset.csv
 !distortions/sample_*.csv
 
 # Temporary files

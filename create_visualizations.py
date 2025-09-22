@@ -366,7 +366,7 @@ def main():
     print('=' * 60)
     
     # Set up paths
-    csv_path = 'distortions/comprehensive_distortion_dataset_FINAL_20250922_015000.csv'
+    csv_path = 'distortions/chameleon_dataset.csv'
     output_dir = Path('analysis_plots')
     output_dir.mkdir(exist_ok=True)
     
