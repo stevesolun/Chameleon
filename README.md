@@ -508,6 +508,21 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 - Open source community for foundational tools and libraries
 - Research collaborators and beta testers
 
+## 🔬 Research Foundation
+
+This project was inspired by the research presented in:
+
+**"Forget What You Know about LLMs Evaluations - LLMs are Like a Chameleon"** by Cohen-Inger et al. ([ArXiv:2502.07445v2](https://arxiv.org/html/2502.07445v2))
+
+While my implementation follows a different approach, I drew inspiration from their Chameleon Benchmark Overfit Detector (C-BOD) framework for systematic evaluation of language model robustness under textual perturbations. Their work highlighted the critical need for assessing model dependence on surface-level patterns versus genuine understanding.
+
+**Key Differences in My Approach:**
+- **Focus on GPT-5**: Specialized testing of OpenAI's latest model
+- **Academic Domain Emphasis**: 20-subject curriculum-based evaluation
+- **Parametric Distortion Control**: Fine-grained μ-level distortion scaling (0.0-0.9)
+- **Comprehensive Statistical Analysis**: McNemar's test and subject-specific significance testing
+- **Production Pipeline**: Automated batch processing for large-scale studies
+
 ## 📚 Citations
 
 If you use Chameleon in your research, please cite:
