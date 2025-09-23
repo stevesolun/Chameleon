@@ -8,7 +8,7 @@ A comprehensive framework for testing large language model robustness under lexi
 
 ## 🎯 Project Overview
 
-The Chameleon framework addresses a critical question in AI evaluation: **How robust are large language models to lexical variations in input text?** By applying controlled lexical distortions to academic assessment questions, we can measure model performance degradation and identify vulnerable domains.
+The Chameleon framework addresses a critical question in AI evaluation: **How robust are large language models to lexical variations in input text?** By applying controlled lexical distortions to academic assessment questions, I can measure model performance degradation and identify vulnerable domains.
 
 ### Key Features
 
@@ -375,7 +375,7 @@ export OPENAI_BASE_URL="https://api.openai.com/v1"
 
 ### McNemar's Test Summary
 
-Our comprehensive statistical analysis using **McNemar's test for paired comparisons** reveals statistically significant performance degradation across multiple dimensions:
+My comprehensive statistical analysis using **McNemar's test for paired comparisons** reveals statistically significant performance degradation across multiple dimensions:
 
 #### 🎯 **Key Statistical Findings**
 - **100% of distortion levels** show highly significant degradation (p < 0.001)
@@ -637,7 +637,7 @@ jupyter>=1.0.0          # Interactive notebooks
 
 ## 🤝 Contributing
 
-We welcome contributions! Please see our [Contributing Guidelines](CONTRIBUTING.md) for details.
+Contributions are welcome! Please see the [Contributing Guidelines](CONTRIBUTING.md) for details.
 
 ### Development Setup
 
@@ -682,7 +682,7 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 - OpenAI for GPT-5 API access and batch processing capabilities
 - Academic institutions providing question datasets
 - Open source community for foundational tools and libraries
-- Research collaborators and beta testers
+- Community feedback and testing support
 
 ## 🔬 Research Foundation
 
@@ -706,9 +706,9 @@ If you use Chameleon in your research, please cite:
 ```bibtex
 @software{chameleon2024,
   title={Chameleon: GPT-5 Robustness Testing Framework},
-  author={Your Name},
+  author={Steve Solun},
   year={2024},
-  url={https://github.com/your-username/chameleon}
+  url={https://github.com/stevesolun/Chameleon}
 }
 ```
 
