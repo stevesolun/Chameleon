@@ -4,7 +4,7 @@
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![OpenAI API](https://img.shields.io/badge/OpenAI-GPT--5-green.svg)](https://openai.com/api/)
 
-A comprehensive framework for testing large language model robustness under lexical distortion. The Chameleon project systematically evaluates GPT-5's performance across 20 academic subjects with varying levels of lexical perturbation (μ = 0.0 to 0.9).
+A comprehensive framework for testing large language model robustness under lexical distortion. The Chameleon project systematically evaluates GPT-5's performance across 20 academic subjects from the **MMLU (Massive Multitask Language Understanding)** benchmark with varying levels of lexical perturbation (μ = 0.0 to 0.9).
 
 ## 🎯 Project Overview
 
@@ -81,7 +81,7 @@ Chameleon/
 │   └── tracking/
 │       └── batch_info.json                 # Batch processing status
 ├── 📁 data/
-│   └── questions.json                       # Original question dataset
+│   └── questions.json                       # MMLU questions dataset
 ├── 📁 distortions/
 │   └── chameleon_dataset.csv               # Final comprehensive dataset
 ├── 📁 analysis_plots/                      # All visualizations and analysis
@@ -680,7 +680,7 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 ## 🙏 Acknowledgments
 
 - OpenAI for GPT-5 API access and batch processing capabilities
-- Academic institutions providing question datasets
+- MMLU (Massive Multitask Language Understanding) benchmark creators for the question datasets
 - Open source community for foundational tools and libraries
 - Community feedback and testing support
 
@@ -712,7 +712,7 @@ If you use Chameleon in your research, please cite:
 }
 ```
 
-**Foundational Work Citation:**
+**Foundational Work Citations:**
 ```bibtex
 @article{cohen2025forget,
   title={Forget What You Know about LLMs Evaluations - LLMs are Like a Chameleon},
@@ -720,6 +720,14 @@ If you use Chameleon in your research, please cite:
   journal={arXiv preprint arXiv:2502.07445},
   year={2025},
   url={https://arxiv.org/html/2502.07445v2}
+}
+
+@article{hendrycks2020measuring,
+  title={Measuring Massive Multitask Language Understanding},
+  author={Hendrycks, Dan and Burns, Collin and Basart, Steven and Zou, Andy and Mazeika, Mantas and Song, Dawn and Steinhardt, Jacob},
+  journal={arXiv preprint arXiv:2009.03300},
+  year={2020},
+  url={https://arxiv.org/abs/2009.03300}
 }
 ```
 
