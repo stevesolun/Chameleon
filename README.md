@@ -712,6 +712,17 @@ If you use Chameleon in your research, please cite:
 }
 ```
 
+**Foundational Work Citation:**
+```bibtex
+@article{cohen2025forget,
+  title={Forget What You Know about LLMs Evaluations - LLMs are Like a Chameleon},
+  author={Cohen-Inger, Nurit and Elisha, Yehonatan and Shapira, Bracha and Rokach, Lior and Cohen, Seffi},
+  journal={arXiv preprint arXiv:2502.07445},
+  year={2025},
+  url={https://arxiv.org/html/2502.07445v2}
+}
+```
+
 ## 🗺️ Future Ideas & Improvements
 
 ### 🚀 LLM Expansion
