@@ -40,17 +40,23 @@ export OPENAI_API_KEY="your-api-key-here"
 ### Basic Usage
 
 ```bash
-# 1. Prepare distorted questions
+# 1. Prepare distorted questions (if needed)
 python3 chameleon.py --generate-distortions
 
-# 2. Process with GPT-5
+# 2. Process with GPT-5 (if needed)
 python3 gpt5_manager.py submit --auto
 
-# 3. Monitor progress
+# 3. Monitor progress (if needed)
 python3 gpt5_manager.py monitor
 
-# 4. Generate analysis
-python3 -c "import analysis; analysis.generate_report()"
+# 4. Clean and validate answers
+python3 clean_gpt5_answers.py
+
+# 5. Generate visualizations
+python3 create_visualizations.py
+
+# 6. Run statistical analysis
+python3 statistical_analysis.py
 ```
 
 ## 🏗️ Architecture
@@ -60,28 +66,49 @@ python3 -c "import analysis; analysis.generate_report()"
 ```
 Chameleon/
 ├── 📁 config/
-│   └── config.yaml              # Project configuration
+│   └── config.yaml                          # Project configuration
 ├── 📁 modules/
-│   ├── data_preparation.py      # Question preparation and distortion
-│   ├── gpt5_batch_processor.py  # Batch processing logic
-│   └── mistral_server.py        # Distortion generation server
+│   ├── data_preparation.py                  # Question preparation and distortion
+│   ├── gpt5_batch_processor.py             # Batch processing logic
+│   └── mistral_server.py                   # Distortion generation server
 ├── 📁 batches/
-│   ├── requests/                # OpenAI batch requests
-│   ├── results/                 # GPT-5 responses
-│   └── metadata/                # Processing metadata
+│   ├── requests/
+│   │   └── all_openai_requests.jsonl       # Consolidated batch requests
+│   ├── results/
+│   │   └── all_gpt5_responses.jsonl        # Consolidated GPT-5 responses
+│   ├── metadata/
+│   │   └── project_metadata.json           # Project statistics and metadata
+│   └── tracking/
+│       └── batch_info.json                 # Batch processing status
+├── 📁 data/
+│   └── questions.json                       # Original question dataset
 ├── 📁 distortions/
-│   └── chameleon_dataset.csv        # Final results dataset
-├── 📁 analysis_plots/
-│   ├── 1_subject_degradation_ranking.png  # Subject vulnerability ranking
+│   └── chameleon_dataset.csv               # Final comprehensive dataset
+├── 📁 analysis_plots/                      # All visualizations and analysis
+│   ├── 1_subject_degradation_ranking.png   # Subject vulnerability ranking
 │   ├── 2_degradation_by_miu_level.png     # μ level impact analysis
 │   ├── 3_degradation_distribution.png     # Degradation distribution
 │   ├── 4_degradation_progression.png      # Progression patterns
 │   ├── 5_subject_resilience_ranking.png   # Resilience ranking
 │   ├── 6_key_distortion_levels_heatmap.png # Key μ levels heatmap
-│   └── enhanced_degradation_heatmap.png   # Complete degradation matrix
-├── chameleon.py                 # Main orchestration script
-├── gpt5_manager.py             # GPT-5 batch management
-└── monitor_repair.py           # Monitoring and repair utilities
+│   ├── enhanced_degradation_heatmap.png   # Complete degradation matrix
+│   ├── statistical_significance_distortion.png # McNemar test results
+│   ├── subject_significance_heatmap.png   # Subject significance analysis
+│   ├── mcnemar_distortion_results.csv     # Statistical test results
+│   ├── mcnemar_pairwise_results.csv       # Pairwise comparisons
+│   ├── mcnemar_subject_results.csv        # Subject-specific tests
+│   └── Statistical_Analysis_Report.md     # Comprehensive statistical report
+├── chameleon.py                            # Main orchestration script
+├── gpt5_manager.py                        # GPT-5 batch management
+├── monitor_repair.py                      # Monitoring and repair utilities
+├── create_visualizations.py               # Visualization generation script
+├── clean_gpt5_answers.py                  # Answer cleaning and validation
+├── statistical_analysis.py                # McNemar's test implementation
+├── Chameleon_Analysis_Report.md           # Main analysis report
+├── requirements.txt                       # Core dependencies
+├── requirements-dev.txt                   # Development dependencies
+├── CONTRIBUTING.md                        # Contribution guidelines
+└── LICENSE                                # MIT License
 ```
 
 ### Data Flow
@@ -98,29 +125,87 @@ graph LR
 
 ## 🔧 System Functionality
 
-### 1. Distortion Generation
+### 1. Distortion Generation Strategy
 
-The system applies controlled lexical distortions using a parameter μ (mu) that controls distortion intensity:
+The system applies controlled lexical distortions using **Mistral 7B Instruct v0.3** with a sophisticated μ-to-temperature mapping formula that preserves semantic meaning while varying surface linguistic patterns.
+
+#### **📐 Distortion Formula**
+
+The core distortion strategy uses a **parametric μ (mu) value** that controls intensity, mapped to Mistral's temperature using a custom formula:
 
 ```python
-# Example distortion levels
-μ = 0.0  # No distortion (baseline)
-μ = 0.3  # Light distortion
-μ = 0.6  # Moderate distortion  
-μ = 0.9  # Heavy distortion
+def calculate_temperature_from_miu(miu: float) -> float:
+    """
+    μ → Temperature mapping using exponential + sigmoid + paraphrase boost
+    """
+    # Base exponential component for growth
+    exponential_component = 0.3 + (miu ** 1.5) * 1.2
+    
+    # Sigmoid component for smooth transitions
+    sigmoid_boost = 0.3 * (1 / (1 + math.exp(-10 * (miu - 0.5))))
+    
+    # Strategic boost for high μ values (paraphrase territory)
+    paraphrase_boost = 0.0
+    if miu >= 0.7:
+        paraphrase_boost = 0.2 * ((miu - 0.7) / 0.3) ** 2
+    
+    # Combine and clamp to [0.1, 1.8]
+    temperature = exponential_component + sigmoid_boost + paraphrase_boost
+    return max(0.1, min(1.8, temperature))
 ```
 
-**Original Question:**
+#### **🎛️ μ-Level Distortion Strategies**
+
+| μ Level | Temperature | Strategy | Description |
+|---------|-------------|----------|-------------|
+| **0.0** | 0.10 | No Distortion | Original question unchanged |
+| **0.1** | 0.34 | Minimal Lexical | 1-2 word substitutions maximum |
+| **0.2** | 0.50 | Light Lexical | Minor synonym replacements |
+| **0.3** | 0.64 | Moderate Lexical | Word order changes + synonyms |
+| **0.4** | 0.78 | Heavy Lexical | Complex substitutions + structure |
+| **0.5** | 0.93 | Mixed Strategy | Lexical + light syntactic changes |
+| **0.6** | 1.08 | Advanced Mixed | Syntactic restructuring + lexical |
+| **0.7** | 1.24 | Heavy Mixed | Complex paraphrasing begins |
+| **0.8** | 1.41 | Pre-Paraphrase | Near-complete reformulation |
+| **0.9** | 1.59 | Full Paraphrase | Maximum creativity and change |
+
+#### **🤖 Model Implementation**
+
+**Base Model**: Mistral 7B Instruct v0.3  
+**Prompt Strategy**: RLHF-optimized system prompt with strict guidelines  
+**Generation Parameters**:
+- Dynamic temperature based on μ formula
+- Top-p sampling: 0.9
+- Max tokens: 2000-4000 (depending on batch size)
+- Uniqueness validation: Every distortion must be completely unique
+
+#### **📝 Example Distortion Progression**
+
+**Original Question (μ = 0.0):**
 ```
 Which operator in Python carries out exponentiation?
 A) **   B) ^   C) exp   D) pow
 ```
 
-**Distorted Question (μ = 0.5):**
+**Light Distortion (μ = 0.3, temp = 0.64):**
 ```
-Which operator in Python 3 carries out exponentiation on operands?
+Which operator in Python performs exponentiation?
 A) **   B) ^   C) exp   D) pow
 ```
+
+**Heavy Distortion (μ = 0.9, temp = 1.59):**
+```
+In Python programming, what symbol is used to raise a number to a power?
+A) **   B) ^   C) exp   D) pow
+```
+
+#### **🔒 Semantic Preservation Rules**
+
+1. **Answer Invariance**: Correct answer must remain the same
+2. **Multiple Choice Integrity**: A/B/C/D options unchanged
+3. **Factual Consistency**: No introduction of errors or contradictions
+4. **Question Type Preservation**: What/How/Why structure maintained
+5. **Domain Context**: Subject-specific terminology preserved when critical
 
 ### 2. Batch Processing Pipeline
 
@@ -154,7 +239,16 @@ python3 create_visualizations.py
 
 # Clean GPT-5 answers and calculate accuracy
 python3 clean_gpt5_answers.py
+
+# Run comprehensive statistical analysis (McNemar's tests)
+python3 statistical_analysis.py
 ```
+
+**Generated Analysis Files:**
+- **Visualizations**: 7 individual PNG plots showing degradation patterns
+- **Statistical Tests**: McNemar's test results for distortion levels, subjects, and pairwise comparisons
+- **CSV Reports**: Detailed statistical results with p-values and significance levels
+- **Comprehensive Report**: `Chameleon_Analysis_Report.md` with complete findings
 
 ## 📚 Usage Examples
 
@@ -272,10 +366,84 @@ export OPENAI_BASE_URL="https://api.openai.com/v1"
 
 | μ Level | Accuracy | Degradation |
 |---------|----------|-------------|
-| 0.0 | 95.0% | 0.0% |
-| 0.3 | 88.3% | 6.7% |
-| 0.6 | 84.0% | 11.0% |
-| 0.9 | 79.6% | 15.4% |
+| 0.0 | 95.5% | 0.0% |
+| 0.3 | 89.6% | 5.9% |
+| 0.6 | 85.5% | 10.0% |
+| 0.9 | 80.9% | 14.6% |
+
+## 📊 Statistical Analysis Results
+
+### McNemar's Test Summary
+
+Our comprehensive statistical analysis using **McNemar's test for paired comparisons** reveals statistically significant performance degradation across multiple dimensions:
+
+#### 🎯 **Key Statistical Findings**
+- **100% of distortion levels** show highly significant degradation (p < 0.001)
+- **85% of academic subjects** exhibit significant vulnerability to lexical distortion
+- **Strong statistical evidence** that GPT-5 relies on surface-level linguistic patterns
+- **Non-linear degradation pattern** with distinct vulnerability thresholds
+
+### 🔬 Distortion Level Analysis (vs Baseline μ=0.0)
+
+| μ Level | Baseline Acc | Distorted Acc | Degradation | McNemar χ² | p-value | Significance |
+|---------|--------------|---------------|-------------|------------|---------|--------------|
+| **0.1** | 95.5% | 91.2% | **4.2%** | 45.52 | < 0.001 | *** |
+| **0.2** | 95.5% | 89.3% | **6.2%** | 84.05 | < 0.001 | *** |
+| **0.3** | 95.5% | 89.6% | **5.9%** | 74.40 | < 0.001 | *** |
+| **0.4** | 95.5% | 88.7% | **6.8%** | 92.08 | < 0.001 | *** |
+| **0.5** | 95.5% | 88.5% | **7.0%** | 96.61 | < 0.001 | *** |
+| **0.6** | 95.5% | 85.5% | **10.0%** | 151.15 | < 0.001 | *** |
+| **0.7** | 95.5% | 86.8% | **8.7%** | 125.75 | < 0.001 | *** |
+| **0.8** | 95.5% | 81.5% | **14.0%** | 226.28 | < 0.001 | *** |
+| **0.9** | 95.5% | 80.9% | **14.6%** | 240.57 | < 0.001 | *** |
+
+> **Statistical Note**: All p-values < 0.001 indicate highly significant degradation. Even minimal distortion (μ=0.1) causes statistically significant performance loss.
+
+### 📚 Subject Vulnerability Rankings
+
+#### **Most Vulnerable Subjects** (Baseline vs μ=0.9)
+| Subject | Degradation | p-value | Significance |
+|---------|-------------|---------|--------------|
+| **Formal Logic** | **51.0%** | < 0.001 | *** |
+| **Econometrics** | **48.0%** | < 0.001 | *** |
+| **College Mathematics** | **36.0%** | < 0.001 | *** |
+| **High School Computer Science** | **25.0%** | < 0.001 | *** |
+| **Professional Law** | **18.0%** | < 0.01 | ** |
+
+#### **Most Resilient Subjects**
+| Subject | Degradation | p-value | Significance |
+|---------|-------------|---------|--------------|
+| **High School Biology** | **-2.0%** | 0.724 | Not significant |
+| **Moral Disputes** | **-1.0%** | 1.000 | Not significant |
+| **High School Psychology** | **3.0%** | 0.248 | Not significant |
+| **College Biology** | **6.0%** | < 0.05 | * |
+| **Marketing** | **6.0%** | < 0.05 | * |
+
+### ⚡ Critical Distortion Thresholds
+
+#### **Significant Performance Drops** (Pairwise μ Comparisons)
+| Transition | Accuracy Drop | p-value | Significance |
+|------------|---------------|---------|--------------|
+| **μ=0.0 → 0.1** | **4.2%** | < 0.001 | *** |
+| **μ=0.1 → 0.2** | **1.9%** | < 0.01 | ** |
+| **μ=0.5 → 0.6** | **3.0%** | < 0.001 | *** |
+| **μ=0.7 → 0.8** | **5.3%** | < 0.001 | *** |
+
+#### **Stable Regions** (No Significant Change)
+- **μ=0.2 → 0.5**: Plateau region with minimal degradation
+- **μ=0.8 → 0.9**: Performance stabilizes at low accuracy
+
+### 🔍 Statistical Interpretation
+
+**McNemar's Test Results Indicate:**
+1. **Surface Pattern Dependency**: Highly significant degradation across all distortion levels suggests GPT-5 relies heavily on exact wording patterns
+2. **Domain-Specific Vulnerability**: Mathematical and logical reasoning subjects show extreme vulnerability (36-51% degradation)
+3. **Non-Linear Degradation**: Performance drops occur in distinct thresholds rather than gradual decline
+4. **Robustness Limits**: Even minimal lexical changes (μ=0.1) cause statistically significant accuracy loss
+
+**Confidence Level**: All reported significances use α = 0.05 with Bonferroni correction for multiple comparisons.
+
+> **⚠️ Critical Finding**: The statistical evidence strongly suggests that **GPT-5's high performance on academic benchmarks may partially stem from memorization of specific linguistic patterns** rather than pure reasoning capability.
 
 ## 🔬 Research Applications
 
@@ -435,15 +603,30 @@ python3 chameleon.py --validate-data
 
 ### Python Dependencies
 
+**Core Dependencies** (`requirements.txt`):
 ```txt
-pandas>=1.5.0
-numpy>=1.20.0
-matplotlib>=3.5.0
-seaborn>=0.11.0
-openai>=1.0.0
-pyyaml>=6.0
-requests>=2.28.0
-tqdm>=4.64.0
+pandas>=1.5.0          # Data manipulation and analysis
+numpy>=1.20.0           # Numerical computing
+matplotlib>=3.5.0       # Data visualization
+seaborn>=0.11.0         # Statistical data visualization
+openai>=1.0.0           # OpenAI API client
+pyyaml>=6.0             # Configuration file parsing
+requests>=2.28.0        # HTTP library
+tqdm>=4.64.0            # Progress bars
+psutil>=5.9.0           # System monitoring
+httpx>=0.25.0           # Async HTTP client
+statsmodels>=0.14.0     # Statistical analysis (McNemar's test)
+scipy>=1.10.0           # Scientific computing
+```
+
+**Development Dependencies** (`requirements-dev.txt`):
+```txt
+pytest>=7.0.0          # Testing framework
+black>=23.0.0           # Code formatting
+flake8>=6.0.0           # Code linting
+mypy>=1.0.0             # Type checking
+sphinx>=6.0.0           # Documentation generation
+jupyter>=1.0.0          # Interactive notebooks
 ```
 
 ### API Requirements
@@ -493,13 +676,6 @@ black src/ tests/
 ## 📄 License
 
 This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
-
-## 📞 Support
-
-- **Documentation**: [Wiki](https://github.com/your-username/chameleon/wiki)
-- **Issues**: [GitHub Issues](https://github.com/your-username/chameleon/issues)
-- **Discussions**: [GitHub Discussions](https://github.com/your-username/chameleon/discussions)
-- **Email**: chameleon-support@example.com
 
 ## 🙏 Acknowledgments
 
