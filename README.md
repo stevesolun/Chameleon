@@ -8,13 +8,21 @@
 
 Chameleon tests how well language models handle semantically equivalent but lexically varied questions. It applies controlled distortions (μ=0.0 to μ=0.9) while preserving meaning and correct answers, then measures performance degradation.
 
+## ⚡ Requirements
+
+| Component | Provider | Purpose |
+|-----------|----------|---------|
+| **Distortion Engine** | [Mistral AI](https://console.mistral.ai/) | Generates semantic paraphrases |
+| **Target Model** | [OpenAI](https://platform.openai.com/) | Model being evaluated (GPT-4o, GPT-5.1, etc.) |
+
+> **Note:** You need API keys from both providers. Get your Mistral key at [console.mistral.ai](https://console.mistral.ai/) and OpenAI key at [platform.openai.com](https://platform.openai.com/api-keys).
+
 ## ✨ Key Features
 
 - 🔬 **Semantic Distortion Engine**: Uses Mistral to generate meaning-preserving paraphrases at 10 intensity levels
 - 📊 **Statistical Analysis**: McNemar's tests, confidence intervals, significance testing
 - 📈 **Rich Visualizations**: Heatmaps, accuracy plots, degradation analysis
 - 🚀 **Batch API Support**: OpenAI & Mistral batch APIs for efficient large-scale evaluation
-- 🤖 **Multi-Model**: Test OpenAI GPT, Anthropic Claude, or local models
 - 📝 **Executive Reports**: Auto-generated markdown reports with charts and insights
 
 ## 📦 Installation
@@ -33,9 +41,6 @@ source venv/bin/activate  # Linux/Mac
 
 # Install dependencies
 pip install -r requirements.txt
-
-# Install as editable package (optional)
-pip install -e .
 ```
 
 ### Option 2: Docker
@@ -50,26 +55,19 @@ docker run -it --rm \
   -e OPENAI_API_KEY=$OPENAI_API_KEY \
   -e MISTRAL_API_KEY=$MISTRAL_API_KEY \
   chameleon python cli.py --help
-
-# Run analysis on a project
-docker run -it --rm \
-  -v $(pwd)/Projects:/app/Projects \
-  chameleon python cli.py analyze --project MyProject
 ```
 
-### API Keys Setup
+## 🔑 API Keys Setup
 
-Create a `.env` file in your project directory or export environment variables:
+You need API keys from:
+- **Mistral AI**: [console.mistral.ai](https://console.mistral.ai/) - for distortion generation
+- **OpenAI**: [platform.openai.com](https://platform.openai.com/api-keys) - for target model evaluation
+
+Set them as environment variables or the CLI will prompt you:
 
 ```bash
-# Required for distortion generation
 export MISTRAL_API_KEY="your-mistral-key"
-
-# Required for target model evaluation (if using OpenAI)
 export OPENAI_API_KEY="your-openai-key"
-
-# Optional
-export ANTHROPIC_API_KEY="your-anthropic-key"
 ```
 
 ## 🚀 Quick Start
@@ -82,7 +80,7 @@ python cli.py init
 
 Follow the interactive prompts to configure:
 - Project name
-- Target model (e.g., GPT-5.1, Claude)
+- Target model (e.g., gpt-5.1, gpt-4o)
 - Distortion settings (μ values, distortions per question)
 - API keys
 
@@ -101,7 +99,7 @@ Optional: `subject`, `question_id`
 python cli.py distort --project MyProject
 ```
 
-This uses Mistral to create semantic paraphrases at each μ level.
+Uses Mistral to create semantic paraphrases at each μ level.
 
 ### 4. Evaluate Target Model
 
@@ -109,7 +107,7 @@ This uses Mistral to create semantic paraphrases at each μ level.
 python cli.py evaluate --project MyProject
 ```
 
-Sends distorted questions to your target model (e.g., GPT-5.1) via batch API.
+Sends distorted questions to your target model via OpenAI Batch API.
 
 ### 5. Run Analysis
 
@@ -117,34 +115,7 @@ Sends distorted questions to your target model (e.g., GPT-5.1) via batch API.
 python cli.py analyze --project MyProject
 ```
 
-Generates:
-- Statistical analysis (McNemar's tests)
-- Visualizations (heatmaps, plots)
-- Executive report (markdown)
-
-## 📁 Project Structure
-
-```
-Chameleon/
-├── chameleon/                 # Main package
-│   ├── core/                  # Config, project management, schemas
-│   ├── models/                # Model backends (OpenAI, Anthropic, etc.)
-│   ├── distortion/            # Distortion engine and validation
-│   ├── evaluation/            # Batch evaluation processor
-│   ├── analysis/              # Statistics, visualizations, reports
-│   └── cli/                   # Command-line interface
-├── Projects/                  # Your evaluation projects
-│   └── MyProject/
-│       ├── original_data/     # Input CSV files
-│       ├── distorted_data/    # Generated distortions
-│       ├── results/           # Evaluation results & analysis
-│       ├── config.yaml        # Project settings
-│       └── .env               # API keys (gitignored)
-├── cli.py                     # CLI entry point
-├── requirements.txt           # Python dependencies
-├── Dockerfile                 # Docker support
-└── README.md
-```
+Generates statistical analysis, visualizations, and executive report.
 
 ## 📋 CLI Commands
 
@@ -155,21 +126,40 @@ python cli.py list                    # List all projects
 python cli.py status -p PROJECT       # Show project status
 
 # Distortion & Evaluation
-python cli.py distort -p PROJECT      # Generate distortions
-python cli.py evaluate -p PROJECT     # Evaluate target model
+python cli.py distort -p PROJECT      # Generate distortions (requires Mistral)
+python cli.py evaluate -p PROJECT     # Evaluate target model (requires OpenAI)
 
 # Analysis
 python cli.py analyze -p PROJECT      # Run full analysis
 
 # Help
 python cli.py help                    # Show all commands
-python cli.py COMMAND --help          # Command-specific help
 ```
 
-## 📊 Understanding μ (Miu) Levels
+## 📁 Project Structure
 
-| μ Level | Distortion Type | Example |
-|---------|-----------------|---------|
+```
+Chameleon/
+├── chameleon/                 # Main package
+│   ├── core/                  # Config, project management
+│   ├── distortion/            # Mistral-based distortion engine
+│   ├── evaluation/            # OpenAI batch evaluation
+│   └── analysis/              # Statistics and visualizations
+├── Projects/                  # Your evaluation projects
+│   └── MyProject/
+│       ├── original_data/     # Input CSV files
+│       ├── distorted_data/    # Generated distortions
+│       ├── results/           # Evaluation results & analysis
+│       └── config.yaml        # Project settings
+├── cli.py                     # CLI entry point
+├── requirements.txt           # Dependencies
+└── Dockerfile                 # Docker support
+```
+
+## 📊 Understanding μ (Miu) Distortion Levels
+
+| μ Level | Distortion Type | Description |
+|---------|-----------------|-------------|
 | 0.0 | None (baseline) | Original question unchanged |
 | 0.1-0.2 | Minimal | 1-3 word synonyms |
 | 0.3-0.4 | Moderate | Phrase restructuring |
@@ -177,76 +167,28 @@ python cli.py COMMAND --help          # Command-specific help
 | 0.7-0.8 | Heavy | Major paraphrasing |
 | 0.9 | Full | Complete reconstruction |
 
-## 📈 Example Results
+## 📈 Output
 
-From Medical Certification Exam benchmark (58,786 questions):
+After running analysis, you get:
 
-| μ Level | Accuracy | Degradation from Baseline |
-|---------|----------|---------------------------|
-| 0.0 | 63.3% | — (baseline) |
-| 0.1 | 62.1% | -1.2% |
-| 0.5 | 61.1% | -2.2% |
-| 0.9 | 60.6% | -2.7% |
+- **Visualizations**: Accuracy plots, degradation heatmaps, statistical significance charts
+- **Statistics**: McNemar's test results, confidence intervals, per-subject breakdown
+- **Reports**: `Executive_Report.md` with full analysis and findings
 
-**Key Finding**: GPT-5.1 shows ~2.7% degradation from baseline to maximum distortion, indicating moderate robustness to lexical variations.
-
-## 🔬 Statistical Methods
-
-### McNemar's Test
-
-Used for paired binary outcomes (correct/incorrect) to determine if accuracy differences are statistically significant:
-
-```python
-from chameleon.analysis import analyze_distortion_significance
-
-results = analyze_distortion_significance(
-    df,
-    baseline_col="miu",
-    baseline_value=0.0,
-    is_correct_col="is_correct"
-)
-```
-
-### Confidence Intervals
-
-Wilson score intervals for accuracy proportions with 95% confidence.
+All outputs are saved to `Projects/YourProject/results/`
 
 ## 🐳 Docker Usage
 
-### Build
-
 ```bash
+# Build
 docker build -t chameleon .
-```
 
-### Run Commands
-
-```bash
-# Interactive shell
+# Run with mounted projects and API keys
 docker run -it --rm \
   -v $(pwd)/Projects:/app/Projects \
   -e MISTRAL_API_KEY=$MISTRAL_API_KEY \
   -e OPENAI_API_KEY=$OPENAI_API_KEY \
-  chameleon bash
-
-# Run specific command
-docker run --rm \
-  -v $(pwd)/Projects:/app/Projects \
-  chameleon python cli.py list
-```
-
-## 🛠️ Development
-
-```bash
-# Install dev dependencies
-pip install -e ".[dev]"
-
-# Run tests
-pytest tests/
-
-# Format code
-black chameleon/
-ruff check chameleon/
+  chameleon python cli.py init
 ```
 
 ## 📄 Citation
@@ -277,13 +219,6 @@ If you use Chameleon in your research, please cite:
 ## 📄 License
 
 MIT License - see [LICENSE](LICENSE) for details.
-
-## 🙏 Acknowledgments
-
-- [Mistral AI](https://mistral.ai/) for distortion generation
-- [OpenAI](https://openai.com/) for GPT evaluation
-- The authors of the original Chameleon research paper
-- The open-source ML community
 
 ---
 
