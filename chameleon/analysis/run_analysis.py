@@ -99,9 +99,13 @@ def run_full_analysis(
     # Ensure is_correct is boolean
     df['is_correct'] = df['is_correct'].astype(bool)
     
-    # Create output directory for plots
-    plots_dir = results_dir / "analysis_plots"
-    plots_dir.mkdir(parents=True, exist_ok=True)
+    # Create unified output directory for all analysis
+    # Consolidates previous analysis_plots/ and synergy_analysis/ into single analysis/
+    analysis_dir = results_dir / "analysis"
+    analysis_dir.mkdir(parents=True, exist_ok=True)
+    
+    # For backward compatibility, also reference as plots_dir
+    plots_dir = analysis_dir
     
     generated_files = []
     
@@ -304,7 +308,8 @@ def run_full_analysis(
     try:
         from .synergy_engine import run_synergy_analysis
         
-        synergy_dir = results_dir / "synergy_analysis"
+        # Output to same unified analysis directory
+        synergy_dir = analysis_dir
         print(f"   Output: {synergy_dir}")
         
         synergy_result = run_synergy_analysis(

@@ -166,43 +166,70 @@ Chameleon/
 
 ## 📈 Analysis Output
 
-After running `python cli.py analyze --project YourProject`, you get **30+ files** including:
+After running `python cli.py analyze --project YourProject`, all outputs are saved to `Projects/YourProject/results/analysis/`:
 
-### Core Metrics
-| File | Description |
-|------|-------------|
-| `01_accuracy_by_miu.png` | Accuracy curve showing degradation across μ levels |
-| `02_accuracy_by_subject_miu.csv` | Per-subject breakdown at each distortion level |
-| `03_chameleon_robustness_index.csv` | **CRI scores** - weighted robustness metric |
-| `04_elasticity.png` | Linear regression showing degradation rate |
-| `05_model_comparison.csv` | Head-to-head model comparison |
+### 📊 Core Metrics
 
-### Error Analysis
-| File | Description |
-|------|-------------|
-| `06_error_taxonomy.json` | Classification of error types (blank, wrong choice, invalid) |
-| `07_confusion_clusters.json` | TF-IDF clustering of failure patterns |
+| File | Description | Key Insight |
+|------|-------------|-------------|
+| `01_accuracy_by_miu.csv/png` | Accuracy curve across μ levels | How quickly does accuracy degrade? |
+| `02_accuracy_by_subject_miu.csv` | Per-subject breakdown | Which subjects are most vulnerable? |
+| `03_chameleon_robustness_index.csv` | CRI scores (global + per-subject) | Single metric for model ranking |
+| `04_elasticity.csv/png` | Linear regression of degradation | Quantify fragility with slope |
+| `05_model_comparison.csv/png` | Head-to-head comparison table | Compare all metrics in one view |
 
-### Statistical Analysis
-| File | Description |
-|------|-------------|
-| `08_bootstrap_intervals.csv` | 95% confidence intervals |
-| McNemar test CSVs | Statistical significance of degradation |
+### 🔬 Error Analysis
 
-### Advanced Analysis
-| File | Description |
-|------|-------------|
-| `09_delta_accuracy_heatmap.png` | Subject × μ degradation visualization |
-| `10_question_difficulty_tiers.json` | Easy/Medium/Hard/**Chameleon Breakers** |
-| `11_executive_summary.md` | **Start here** - comprehensive findings report |
+| File | Description | Key Insight |
+|------|-------------|-------------|
+| `06_error_taxonomy.json` | Classification: blank, wrong_choice, invalid_format, multiple_options | Where do failures come from? |
+| `07_confusion_clusters.json` | TF-IDF + KMeans clustering of failures | Which linguistic patterns cause errors? |
 
-### Key Metrics Explained
+### 📉 Statistical Analysis
 
-- **CRI (Chameleon Robustness Index)**: Weighted accuracy emphasizing high-μ performance. Higher = more robust.
-- **Elasticity Slope**: How fast accuracy drops per μ increase. Closer to 0 = more robust.
-- **Chameleon Breakers**: Questions where model succeeds at μ=0 but fails catastrophically at high μ - evidence of surface pattern matching rather than true understanding.
+| File | Description | Key Insight |
+|------|-------------|-------------|
+| `08_bootstrap_intervals.csv` | 95% confidence intervals (500 samples) | Are differences statistically significant? |
+| `mcnemar_distortion_results.csv` | McNemar's test: μ=0 vs μ>0 | Paired significance testing |
+| `mcnemar_subject_results.csv` | Per-subject McNemar tests | Subject-specific significance |
+| `mcnemar_pairwise_results.csv` | Adjacent μ level comparisons | Which μ jumps matter most? |
 
-All outputs saved to `Projects/YourProject/results/` and `results/synergy_analysis/`
+### 🎯 Advanced Analysis
+
+| File | Description | Key Insight |
+|------|-------------|-------------|
+| `09_delta_accuracy_heatmap.csv/png` | Subject × μ degradation matrix | Visual: Red = high degradation |
+| `10_question_difficulty_tiers.json` | Easy/Medium/Hard/Chameleon Breakers | Find pattern-matching evidence |
+| `11_executive_summary.md` | **START HERE** - Full findings report | Comprehensive interpretation |
+
+---
+
+## 🔑 Key Metrics Explained
+
+### Chameleon Robustness Index (CRI)
+Weighted accuracy that emphasizes high-distortion performance:
+```
+CRI = Σ(accuracy(μ) × w(μ)) where w(μ) = exp(2.0 × μ) / Σ exp(2.0 × μ)
+```
+- **CRI > 0.7**: Highly robust
+- **CRI 0.5-0.7**: Moderately robust  
+- **CRI < 0.5**: Fragile
+
+### Elasticity Slope
+Linear regression of accuracy vs μ:
+- **Slope ≈ 0**: Robust (stable across distortions)
+- **Slope < -0.05**: Fragile (>5% accuracy loss per 0.1 μ)
+
+### Question Difficulty Tiers
+
+| Tier | Definition | Interpretation |
+|------|------------|----------------|
+| 🟢 **Easy** | ≥80% at μ=0, ≥70% at μ=0.9 | True understanding |
+| 🟡 **Medium** | Good at low μ, struggles at high | Partial understanding |
+| 🔴 **Hard** | <50% even at μ=0 | Knowledge gap |
+| 💀 **Chameleon Breaker** | ≥70% at μ=0, <30% at μ=0.9 | **Surface pattern matching** |
+
+> **Chameleon Breakers** are the most important finding - they reveal questions where the model appears to understand at baseline but fails catastrophically under paraphrasing, indicating reliance on lexical patterns rather than semantic comprehension.
 
 ## 🐳 Docker Usage
 
