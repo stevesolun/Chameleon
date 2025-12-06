@@ -124,6 +124,8 @@ Generates statistical analysis, visualizations, and executive report.
 python cli.py init                    # Create new project (interactive)
 python cli.py list                    # List all projects
 python cli.py status -p PROJECT       # Show project status
+python cli.py edit -p PROJECT         # Edit project configuration
+python cli.py delete -p PROJECT       # Delete project (double confirmation)
 
 # Distortion & Evaluation
 python cli.py distort -p PROJECT      # Generate distortions (requires Mistral)
