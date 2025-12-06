@@ -238,3 +238,18 @@ coverage.xml
 *.db
 *.sqlite
 *.sqlite3
+# Projects folder (user data)
+Projects/
+
+# Archive folder
+archive/
+
+# Batch files and results
+batch_files/
+*.jsonl
+
+# IDE and tool config
+.mcp.json
+.agentvibes/
+.bmad/
+.claude/
