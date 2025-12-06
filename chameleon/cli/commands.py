@@ -1301,6 +1301,229 @@ def cmd_evaluate(args):
         return 1
 
 
+def cmd_delete(args):
+    """Delete a project with double confirmation."""
+    import shutil
+    
+    print_banner()
+    
+    project_name = args.project
+    projects_dir = Path(args.projects_dir)
+    project_path = projects_dir / project_name
+    
+    if not project_path.exists():
+        print(f"❌ Project '{project_name}' not found")
+        return 1
+    
+    # Show project info
+    print(f"🗑️  DELETE PROJECT: {project_name}")
+    print(f"   Location: {project_path}")
+    print()
+    
+    # Count files
+    file_count = sum(1 for _ in project_path.rglob("*") if _.is_file())
+    print(f"   ⚠️  This will permanently delete {file_count} files!")
+    print()
+    
+    if not args.force:
+        # First confirmation
+        confirm1 = input(f"   Are you sure you want to delete '{project_name}'? (yes/no): ").strip().lower()
+        
+        if confirm1 != 'yes':
+            print("   ❌ Deletion cancelled.")
+            return 0
+        
+        # Second confirmation - type project name
+        print()
+        confirm2 = input(f"   Type the project name to confirm: ").strip()
+        
+        if confirm2 != project_name:
+            print(f"   ❌ Names don't match. Deletion cancelled.")
+            return 0
+    
+    # Delete the project
+    try:
+        shutil.rmtree(project_path)
+        print(f"\n   ✅ Project '{project_name}' deleted successfully.")
+        return 0
+    except Exception as e:
+        print(f"\n   ❌ Error deleting project: {e}")
+        return 1
+
+
+def cmd_edit(args):
+    """Edit project configuration interactively."""
+    import yaml
+    
+    print_banner()
+    
+    project_name = args.project
+    projects_dir = Path(args.projects_dir)
+    project_path = projects_dir / project_name
+    config_path = project_path / "config.yaml"
+    
+    if not project_path.exists():
+        print(f"❌ Project '{project_name}' not found")
+        return 1
+    
+    if not config_path.exists():
+        print(f"❌ Config file not found: {config_path}")
+        return 1
+    
+    # Load current config
+    with open(config_path, 'r', encoding='utf-8') as f:
+        config = yaml.safe_load(f)
+    
+    print(f"✏️  EDIT PROJECT: {project_name}")
+    print("=" * 50)
+    print("\nCurrent configuration:")
+    print("-" * 30)
+    
+    # Show current settings
+    target_model = config.get("target_model", {})
+    distortion = config.get("distortion", {})
+    
+    print(f"   Target Vendor: {target_model.get('vendor', 'N/A')}")
+    print(f"   Target Model: {target_model.get('name', 'N/A')}")
+    print(f"   Miu Values: {distortion.get('miu_values', 'N/A')}")
+    print(f"   Distortions/Question: {distortion.get('distortions_per_question', 'N/A')}")
+    print(f"   Distortion Engine: {distortion.get('engine_type', 'N/A')}")
+    print(f"   Distortion Model: {distortion.get('model', 'N/A')}")
+    print()
+    
+    changes_made = False
+    
+    # Edit options
+    print("What would you like to edit?")
+    print("   1. Target model (vendor/name)")
+    print("   2. Miu values")
+    print("   3. Distortions per question")
+    print("   4. Distortion engine settings")
+    print("   5. All settings (go through everything)")
+    print("   q. Cancel")
+    print()
+    
+    choice = input("Enter choice (1-5 or q): ").strip().lower()
+    
+    if choice == 'q':
+        print("   ❌ Edit cancelled.")
+        return 0
+    
+    if choice in ['1', '5']:
+        print("\n--- Target Model ---")
+        vendors = ["openai", "anthropic", "mistral"]
+        current_vendor = target_model.get('vendor', 'openai')
+        print(f"   Current vendor: {current_vendor}")
+        new_vendor = input(f"   New vendor ({'/'.join(vendors)}) [Enter to keep]: ").strip().lower()
+        if new_vendor and new_vendor in vendors:
+            config['target_model']['vendor'] = new_vendor
+            changes_made = True
+        
+        current_model = target_model.get('name', '')
+        print(f"   Current model: {current_model}")
+        new_model = input(f"   New model name [Enter to keep]: ").strip()
+        if new_model:
+            config['target_model']['name'] = new_model
+            changes_made = True
+    
+    if choice in ['2', '5']:
+        print("\n--- Miu Values ---")
+        current_miu = distortion.get('miu_values', [])
+        print(f"   Current: {current_miu}")
+        print("   Enter new values as comma-separated (e.g., 0.0,0.1,0.5,0.9)")
+        print("   Or range (e.g., 0.0-0.9:0.1)")
+        new_miu = input("   New miu values [Enter to keep]: ").strip()
+        if new_miu:
+            # Parse miu values
+            if '-' in new_miu and ':' in new_miu:
+                # Range format
+                try:
+                    range_part, step = new_miu.split(':')
+                    start, end = range_part.split('-')
+                    start, end, step = float(start), float(end), float(step)
+                    miu_list = []
+                    current = start
+                    while current <= end + 0.001:
+                        miu_list.append(round(current, 1))
+                        current += step
+                    config['distortion']['miu_values'] = miu_list
+                    changes_made = True
+                except:
+                    print("   ⚠️ Invalid format, keeping current values")
+            else:
+                # Comma-separated
+                try:
+                    miu_list = [float(x.strip()) for x in new_miu.split(',')]
+                    config['distortion']['miu_values'] = miu_list
+                    changes_made = True
+                except:
+                    print("   ⚠️ Invalid format, keeping current values")
+    
+    if choice in ['3', '5']:
+        print("\n--- Distortions per Question ---")
+        current_dpq = distortion.get('distortions_per_question', 10)
+        print(f"   Current: {current_dpq}")
+        new_dpq = input("   New value [Enter to keep]: ").strip()
+        if new_dpq:
+            try:
+                config['distortion']['distortions_per_question'] = int(new_dpq)
+                changes_made = True
+            except:
+                print("   ⚠️ Invalid number, keeping current value")
+    
+    if choice in ['4', '5']:
+        print("\n--- Distortion Engine ---")
+        current_engine = distortion.get('engine_type', 'api')
+        print(f"   Current engine: {current_engine}")
+        new_engine = input("   New engine (api/local) [Enter to keep]: ").strip().lower()
+        if new_engine in ['api', 'local']:
+            config['distortion']['engine_type'] = new_engine
+            changes_made = True
+        
+        current_dm = distortion.get('model', '')
+        print(f"   Current distortion model: {current_dm}")
+        new_dm = input("   New model [Enter to keep]: ").strip()
+        if new_dm:
+            config['distortion']['model'] = new_dm
+            changes_made = True
+    
+    if not changes_made:
+        print("\n   ℹ️ No changes made.")
+        return 0
+    
+    # Save config
+    print("\n--- Summary of Changes ---")
+    print(f"   Target Model: {config['target_model'].get('vendor')}/{config['target_model'].get('name')}")
+    print(f"   Miu Values: {config['distortion'].get('miu_values')}")
+    print(f"   Distortions/Question: {config['distortion'].get('distortions_per_question')}")
+    print()
+    
+    save = input("Save changes? (y/n): ").strip().lower()
+    if save != 'y':
+        print("   ❌ Changes discarded.")
+        return 0
+    
+    with open(config_path, 'w', encoding='utf-8') as f:
+        yaml.dump(config, f, default_flow_style=False, allow_unicode=True)
+    
+    print(f"   ✅ Configuration saved to {config_path}")
+    
+    # Ask if they want to regenerate distortions
+    print()
+    regen = input("   Do you want to regenerate distortions with new settings? (y/n): ").strip().lower()
+    if regen == 'y':
+        print("\n   🔄 Starting distortion regeneration...")
+        # Create args-like object for cmd_distort
+        class DistortArgs:
+            project = project_name
+            projects_dir = str(projects_dir)
+            yes = False
+        
+        return cmd_distort(DistortArgs())
+    
+    return 0
+
+
 def cmd_workflow(args):
     """Run the complete Chameleon workflow."""
     print_banner()
@@ -1457,6 +1680,17 @@ def main(argv: Optional[List[str]] = None):
     workflow_parser.add_argument("--skip-evaluation", action="store_true", help="Skip evaluation stage")
     workflow_parser.add_argument("--skip-analysis", action="store_true", help="Skip analysis stage")
     workflow_parser.set_defaults(func=cmd_workflow)
+    
+    # delete command
+    delete_parser = subparsers.add_parser("delete", help="Delete a project")
+    delete_parser.add_argument("--project", "-p", required=True, help="Project name")
+    delete_parser.add_argument("--force", "-f", action="store_true", help="Skip confirmation")
+    delete_parser.set_defaults(func=cmd_delete)
+    
+    # edit command
+    edit_parser = subparsers.add_parser("edit", help="Edit project configuration")
+    edit_parser.add_argument("--project", "-p", required=True, help="Project name")
+    edit_parser.set_defaults(func=cmd_edit)
     
     # config command
     config_parser = subparsers.add_parser("config", help="Global configuration")
