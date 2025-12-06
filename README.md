@@ -343,10 +343,10 @@ The evaluation uses smart comparison: `"A, D"` equals `"D, A"` equals `"a,d"`.
 If you use Chameleon in your research, please cite:
 
 ```bibtex
-@software{chameleon2024,
+@software{chameleon2025,
   title={Chameleon: LLM Robustness Testing Framework},
   author={Steve Solun},
-  year={2024},
+  year={2025},
   url={https://github.com/stevesolun/Chameleon}
 }
 ```
