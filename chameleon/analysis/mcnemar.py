@@ -193,6 +193,10 @@ def analyze_distortion_significance(
     """
     Perform McNemar's tests comparing each distortion level to baseline.
     
+    Handles multiple distortions per question by aggregating:
+    - For baseline (miu=0): single question
+    - For distorted (miu>0): aggregates by majority vote (>50% correct = correct)
+    
     Args:
         df: DataFrame with results
         baseline_col: Column containing distortion level
@@ -206,17 +210,29 @@ def analyze_distortion_significance(
     """
     results = []
     
-    # Get baseline data indexed for pairing
+    # Get baseline data - one entry per question
     baseline_df = df[df[baseline_col] == baseline_value]
-    baseline_correct = baseline_df.set_index([question_id_col, subject_col])[is_correct_col]
+    
+    # Create baseline index
+    if subject_col in baseline_df.columns:
+        baseline_correct = baseline_df.groupby([question_id_col, subject_col])[is_correct_col].first()
+    else:
+        baseline_correct = baseline_df.groupby(question_id_col)[is_correct_col].first()
     
     for level in sorted(df[baseline_col].unique()):
         if level == baseline_value:
             continue
         
-        # Get comparison data
+        # Get comparison data - aggregate multiple distortions per question
+        # Use majority vote: if >50% of distortions are correct, consider it correct
         comp_df = df[df[baseline_col] == level]
-        comp_correct = comp_df.set_index([question_id_col, subject_col])[is_correct_col]
+        
+        if subject_col in comp_df.columns:
+            comp_agg = comp_df.groupby([question_id_col, subject_col])[is_correct_col].mean()
+            comp_correct = (comp_agg > 0.5)  # Majority vote
+        else:
+            comp_agg = comp_df.groupby(question_id_col)[is_correct_col].mean()
+            comp_correct = (comp_agg > 0.5)
         
         # Find common questions
         common_idx = baseline_correct.index.intersection(comp_correct.index)
@@ -235,12 +251,16 @@ def analyze_distortion_significance(
         baseline_ci = calculate_confidence_interval(result.group1_accuracy, n)
         comp_ci = calculate_confidence_interval(result.group2_accuracy, n)
         
+        # Also calculate raw accuracy (not majority vote)
+        raw_comp_acc = comp_df[is_correct_col].mean()
+        raw_baseline_acc = baseline_df[is_correct_col].mean()
+        
         results.append({
             "comparison": f"{baseline_col}={baseline_value} vs {baseline_col}={level}",
             f"{baseline_col}_level": level,
-            "baseline_accuracy": result.group1_accuracy,
-            "comparison_accuracy": result.group2_accuracy,
-            "accuracy_difference": result.accuracy_difference,
+            "baseline_accuracy": raw_baseline_acc,  # Use raw accuracy for display
+            "comparison_accuracy": raw_comp_acc,
+            "accuracy_difference": raw_baseline_acc - raw_comp_acc,
             "baseline_ci_lower": baseline_ci[0],
             "baseline_ci_upper": baseline_ci[1],
             "comparison_ci_lower": comp_ci[0],
@@ -267,6 +287,8 @@ def analyze_subject_significance(
     """
     Perform McNemar's tests for each subject comparing baseline to high distortion.
     
+    Handles multiple distortions per question by aggregating with majority vote.
+    
     Args:
         df: DataFrame with results
         subject_col: Column with subject names
@@ -290,9 +312,12 @@ def analyze_subject_significance(
         if len(baseline_df) == 0 or len(comp_df) == 0:
             continue
         
-        # Pair by question_id
-        baseline_correct = baseline_df.set_index(question_id_col)[is_correct_col]
-        comp_correct = comp_df.set_index(question_id_col)[is_correct_col]
+        # Aggregate baseline (should be one per question, but take first just in case)
+        baseline_correct = baseline_df.groupby(question_id_col)[is_correct_col].first()
+        
+        # Aggregate comparison with majority vote
+        comp_agg = comp_df.groupby(question_id_col)[is_correct_col].mean()
+        comp_correct = (comp_agg > 0.5)  # Majority vote
         
         common_idx = baseline_correct.index.intersection(comp_correct.index)
         
@@ -304,17 +329,20 @@ def analyze_subject_significance(
         
         result = mcnemar_test(baseline_paired, comp_paired)
         
-        degradation_pct = result.accuracy_difference * 100
+        # Calculate raw accuracies for display
+        raw_baseline_acc = baseline_df[is_correct_col].mean()
+        raw_comp_acc = comp_df[is_correct_col].mean()
+        degradation_pct = (raw_baseline_acc - raw_comp_acc) * 100
         
         n = len(common_idx)
-        baseline_ci = calculate_confidence_interval(result.group1_accuracy, n)
-        comp_ci = calculate_confidence_interval(result.group2_accuracy, n)
+        baseline_ci = calculate_confidence_interval(raw_baseline_acc, len(baseline_df))
+        comp_ci = calculate_confidence_interval(raw_comp_acc, len(comp_df))
         
         results.append({
             "subject": subject,
             "subject_name": subject.replace("_", " ").title(),
-            "baseline_accuracy": result.group1_accuracy,
-            "comparison_accuracy": result.group2_accuracy,
+            "baseline_accuracy": raw_baseline_acc,
+            "comparison_accuracy": raw_comp_acc,
             "degradation_percent": degradation_pct,
             "baseline_ci_lower": baseline_ci[0],
             "baseline_ci_upper": baseline_ci[1],
@@ -340,6 +368,8 @@ def analyze_pairwise_levels(
     """
     Perform pairwise McNemar's tests between adjacent distortion levels.
     
+    Handles multiple distortions per question by aggregating with majority vote.
+    
     Args:
         df: DataFrame with results
         level_col: Column with distortion levels
@@ -360,26 +390,45 @@ def analyze_pairwise_levels(
         df1 = df[df[level_col] == level1]
         df2 = df[df[level_col] == level2]
         
-        correct1 = df1.set_index([question_id_col, subject_col])[is_correct_col]
-        correct2 = df2.set_index([question_id_col, subject_col])[is_correct_col]
+        # Aggregate by question with majority vote
+        if subject_col in df.columns:
+            agg1 = df1.groupby([question_id_col, subject_col])[is_correct_col].mean()
+            agg2 = df2.groupby([question_id_col, subject_col])[is_correct_col].mean()
+        else:
+            agg1 = df1.groupby(question_id_col)[is_correct_col].mean()
+            agg2 = df2.groupby(question_id_col)[is_correct_col].mean()
+        
+        correct1 = (agg1 > 0.5) if level1 > 0 else (agg1 > 0.5)  # Majority vote for distorted
+        correct2 = (agg2 > 0.5)
+        
+        # For baseline (level1=0), use first value since there's only one
+        if level1 == 0:
+            if subject_col in df.columns:
+                correct1 = df1.groupby([question_id_col, subject_col])[is_correct_col].first().astype(bool)
+            else:
+                correct1 = df1.groupby(question_id_col)[is_correct_col].first().astype(bool)
         
         common_idx = correct1.index.intersection(correct2.index)
         
         if len(common_idx) == 0:
             continue
         
-        paired1 = correct1.loc[common_idx].astype(bool).values
-        paired2 = correct2.loc[common_idx].astype(bool).values
+        paired1 = correct1.loc[common_idx].values
+        paired2 = correct2.loc[common_idx].values
         
         result = mcnemar_test(paired1, paired2)
+        
+        # Raw accuracies for display
+        raw_acc1 = df1[is_correct_col].mean()
+        raw_acc2 = df2[is_correct_col].mean()
         
         results.append({
             "comparison": f"{level_col}={level1} vs {level_col}={level2}",
             "level1": level1,
             "level2": level2,
-            "level1_accuracy": result.group1_accuracy,
-            "level2_accuracy": result.group2_accuracy,
-            "accuracy_difference": result.accuracy_difference,
+            "level1_accuracy": raw_acc1,
+            "level2_accuracy": raw_acc2,
+            "accuracy_difference": raw_acc1 - raw_acc2,
             "mcnemar_statistic": result.statistic,
             "p_value": result.p_value,
             "significance": result.significance,

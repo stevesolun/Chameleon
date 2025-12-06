@@ -1,109 +1,204 @@
-# 🦎 Chameleon: LLM Robustness Testing Framework
+# 🦎 Chameleon: LLM Robustness Benchmark Framework
 
 [![Python 3.9+](https://img.shields.io/badge/python-3.9+-blue.svg)](https://www.python.org/downloads/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+[![Docker](https://img.shields.io/badge/docker-ready-blue.svg)](https://www.docker.com/)
 
-A comprehensive framework for testing large language model robustness under various distortion conditions. Evaluate GPT, Claude, and local models across text, image, and other modalities with systematic perturbation analysis.
+**Evaluate LLM robustness under lexical distortions using semantic paraphrasing.**
 
-## ✨ Features
+Chameleon tests how well language models handle semantically equivalent but lexically varied questions. It applies controlled distortions (μ=0.0 to μ=0.9) while preserving meaning and correct answers, then measures performance degradation.
 
-- **🔬 Multi-Model Support**: OpenAI (GPT-4o, GPT-5), Anthropic (Claude), MLX (Apple Silicon), CUDA (NVIDIA GPUs)
-- **📊 Per-Project Organization**: Self-contained evaluation projects with standardized structure
-- **🧮 Statistical Analysis**: McNemar's test, confidence intervals, significance testing
-- **📈 Visualizations**: Degradation heatmaps, accuracy plots, key insights summaries
-- **🚀 Batch Processing**: Async batch APIs for efficient large-scale evaluation
-- **🎯 Modular Design**: Extensible backends, distortion engines, and analysis modules
+## ✨ Key Features
 
-## 🚀 Quick Start
+- 🔬 **Semantic Distortion Engine**: Uses Mistral to generate meaning-preserving paraphrases at 10 intensity levels
+- 📊 **Statistical Analysis**: McNemar's tests, confidence intervals, significance testing
+- 📈 **Rich Visualizations**: Heatmaps, accuracy plots, degradation analysis
+- 🚀 **Batch API Support**: OpenAI & Mistral batch APIs for efficient large-scale evaluation
+- 🤖 **Multi-Model**: Test OpenAI GPT, Anthropic Claude, or local models
+- 📝 **Executive Reports**: Auto-generated markdown reports with charts and insights
 
-### Installation
+## 📦 Installation
+
+### Option 1: pip install (Recommended)
 
 ```bash
 # Clone the repository
 git clone https://github.com/stevesolun/Chameleon.git
 cd Chameleon
 
-# Install core dependencies
+# Create virtual environment (recommended)
+python -m venv venv
+source venv/bin/activate  # Linux/Mac
+# or: venv\Scripts\activate  # Windows
+
+# Install dependencies
 pip install -r requirements.txt
 
-# Or install as a package (recommended)
-pip install -e ".[all]"
+# Install as editable package (optional)
+pip install -e .
+```
 
-# Set up API keys (for remote backends)
+### Option 2: Docker
+
+```bash
+# Build the Docker image
+docker build -t chameleon .
+
+# Run interactive CLI
+docker run -it --rm \
+  -v $(pwd)/Projects:/app/Projects \
+  -e OPENAI_API_KEY=$OPENAI_API_KEY \
+  -e MISTRAL_API_KEY=$MISTRAL_API_KEY \
+  chameleon python cli.py --help
+
+# Run analysis on a project
+docker run -it --rm \
+  -v $(pwd)/Projects:/app/Projects \
+  chameleon python cli.py analyze --project MyProject
+```
+
+### API Keys Setup
+
+Create a `.env` file in your project directory or export environment variables:
+
+```bash
+# Required for distortion generation
+export MISTRAL_API_KEY="your-mistral-key"
+
+# Required for target model evaluation (if using OpenAI)
 export OPENAI_API_KEY="your-openai-key"
-export ANTHROPIC_API_KEY="your-anthropic-key"  # optional
+
+# Optional
+export ANTHROPIC_API_KEY="your-anthropic-key"
 ```
 
-### Create Your First Project
+## 🚀 Quick Start
+
+### 1. Create a Project
 
 ```bash
-# Interactive project creation
 python cli.py init
-
-# Or with command-line arguments
-python cli.py init --name my_gpt5_test --modality text --model gpt-4o --backend openai
 ```
 
-### Project Workflow
+Follow the interactive prompts to configure:
+- Project name
+- Target model (e.g., GPT-5.1, Claude)
+- Distortion settings (μ values, distortions per question)
+- API keys
+
+### 2. Upload Your Data
+
+When prompted, provide CSV files with questions. Required columns:
+- `question_text` - The question
+- `options_json` - Answer options as JSON (e.g., `{"A": "...", "B": "..."}`)
+- `answer` - Correct answer(s) (e.g., "A" or "A, D")
+
+Optional: `subject`, `question_id`
+
+### 3. Generate Distortions
 
 ```bash
-# 1. Create project
-python cli.py init --name mmlu_distortion_test
-
-# 2. Add your data to projects/mmlu_distortion_test/original_data/
-#    (CSV with columns: question_id, original_question, correct_answer, subject, etc.)
-
-# 3. Run analysis (after you have results)
-python cli.py analyze --project mmlu_distortion_test
-
-# 4. View results
-ls projects/mmlu_distortion_test/analysis/
+python cli.py distort --project MyProject
 ```
+
+This uses Mistral to create semantic paraphrases at each μ level.
+
+### 4. Evaluate Target Model
+
+```bash
+python cli.py evaluate --project MyProject
+```
+
+Sends distorted questions to your target model (e.g., GPT-5.1) via batch API.
+
+### 5. Run Analysis
+
+```bash
+python cli.py analyze --project MyProject
+```
+
+Generates:
+- Statistical analysis (McNemar's tests)
+- Visualizations (heatmaps, plots)
+- Executive report (markdown)
 
 ## 📁 Project Structure
 
-Each project follows a standardized structure:
-
-```
-projects/
-└── my_project/
-    ├── original_data/      # Raw/clean input data before distortion
-    ├── distorted_data/     # Distorted versions (generated or imported)
-    ├── results/            # Model outputs from batch runs
-    ├── analysis/           # Analysis outputs (tables, plots, metrics)
-    ├── project_config.yaml # Project configuration
-    └── README.md           # Project-specific documentation
-```
-
-## 🏗️ Repository Architecture
-
 ```
 Chameleon/
-├── chameleon/              # Main package
-│   ├── core/               # Config, project, and data schemas
-│   ├── models/             # Model backends (OpenAI, Anthropic, MLX, CUDA)
-│   ├── analysis/           # Metrics, McNemar, visualizations
-│   └── cli/                # Command-line interface
-├── projects/               # Evaluation projects (created at runtime)
-├── config/                 # Global configuration files
-├── distortions/            # Example distortion datasets
-├── tests/                  # Unit tests
-├── archive/                # Legacy scripts (preserved for reference)
-├── cli.py                  # CLI entry point
-├── pyproject.toml          # Package configuration
-└── requirements.txt        # Dependencies
+├── chameleon/                 # Main package
+│   ├── core/                  # Config, project management, schemas
+│   ├── models/                # Model backends (OpenAI, Anthropic, etc.)
+│   ├── distortion/            # Distortion engine and validation
+│   ├── evaluation/            # Batch evaluation processor
+│   ├── analysis/              # Statistics, visualizations, reports
+│   └── cli/                   # Command-line interface
+├── Projects/                  # Your evaluation projects
+│   └── MyProject/
+│       ├── original_data/     # Input CSV files
+│       ├── distorted_data/    # Generated distortions
+│       ├── results/           # Evaluation results & analysis
+│       ├── config.yaml        # Project settings
+│       └── .env               # API keys (gitignored)
+├── cli.py                     # CLI entry point
+├── requirements.txt           # Python dependencies
+├── Dockerfile                 # Docker support
+└── README.md
 ```
 
-## 📊 Analysis Features
+## 📋 CLI Commands
 
-### McNemar's Statistical Test
+```bash
+# Project Management
+python cli.py init                    # Create new project (interactive)
+python cli.py list                    # List all projects
+python cli.py status -p PROJECT       # Show project status
 
-Compares paired binary outcomes (correct/incorrect) across conditions:
+# Distortion & Evaluation
+python cli.py distort -p PROJECT      # Generate distortions
+python cli.py evaluate -p PROJECT     # Evaluate target model
+
+# Analysis
+python cli.py analyze -p PROJECT      # Run full analysis
+
+# Help
+python cli.py help                    # Show all commands
+python cli.py COMMAND --help          # Command-specific help
+```
+
+## 📊 Understanding μ (Miu) Levels
+
+| μ Level | Distortion Type | Example |
+|---------|-----------------|---------|
+| 0.0 | None (baseline) | Original question unchanged |
+| 0.1-0.2 | Minimal | 1-3 word synonyms |
+| 0.3-0.4 | Moderate | Phrase restructuring |
+| 0.5-0.6 | Mixed | Lexical + structural changes |
+| 0.7-0.8 | Heavy | Major paraphrasing |
+| 0.9 | Full | Complete reconstruction |
+
+## 📈 Example Results
+
+From Medical Certification Exam benchmark (58,786 questions):
+
+| μ Level | Accuracy | Degradation from Baseline |
+|---------|----------|---------------------------|
+| 0.0 | 63.3% | — (baseline) |
+| 0.1 | 62.1% | -1.2% |
+| 0.5 | 61.1% | -2.2% |
+| 0.9 | 60.6% | -2.7% |
+
+**Key Finding**: GPT-5.1 shows ~2.7% degradation from baseline to maximum distortion, indicating moderate robustness to lexical variations.
+
+## 🔬 Statistical Methods
+
+### McNemar's Test
+
+Used for paired binary outcomes (correct/incorrect) to determine if accuracy differences are statistically significant:
 
 ```python
-from chameleon.analysis.mcnemar import analyze_distortion_significance
+from chameleon.analysis import analyze_distortion_significance
 
-# Compare each distortion level vs baseline
 results = analyze_distortion_significance(
     df,
     baseline_col="miu",
@@ -112,101 +207,38 @@ results = analyze_distortion_significance(
 )
 ```
 
-### Visualizations
+### Confidence Intervals
 
-```python
-from chameleon.analysis.visualizations import (
-    create_degradation_heatmap,
-    create_key_insights_summary,
-)
+Wilson score intervals for accuracy proportions with 95% confidence.
 
-# Generate degradation heatmap
-create_degradation_heatmap(performance_df, output_path="analysis/heatmap.png")
-```
+## 🐳 Docker Usage
 
-## 🔧 Model Backends
-
-### OpenAI (Batch API)
-
-```python
-from chameleon.models import get_backend
-from chameleon.core.schemas import BackendType
-
-backend = get_backend(BackendType.OPENAI, "gpt-4o")
-
-# Single completion
-response = backend.complete("What is 2+2?")
-
-# Batch processing (async)
-batch_id = backend.submit_batch(requests, description="MMLU Evaluation")
-status = backend.get_batch_status(batch_id)
-results = backend.get_batch_results(batch_id)
-```
-
-### Anthropic (Claude)
-
-```python
-backend = get_backend(BackendType.ANTHROPIC, "claude-3-5-sonnet-20241022")
-response = backend.complete("What is the capital of France?")
-```
-
-### Local MLX (Apple Silicon)
-
-```python
-backend = get_backend(BackendType.MLX, "mlx-community/Mistral-7B-Instruct-v0.3-4bit")
-response = backend.complete("Explain quantum computing.")
-```
-
-### Local CUDA (NVIDIA)
-
-```python
-backend = get_backend(BackendType.CUDA_LOCAL, "mistralai/Mistral-7B-Instruct-v0.3")
-responses = backend.complete_batch(requests, batch_size=4)
-```
-
-## 📋 CLI Commands
+### Build
 
 ```bash
-# Project Management
-python cli.py init              # Create new project (interactive)
-python cli.py list              # List all projects
-python cli.py status -p NAME    # Show project status
-
-# Analysis
-python cli.py analyze -p NAME   # Run statistical analysis
-
-# Configuration
-python cli.py config --show     # Show global configuration
-python cli.py help              # Show help
+docker build -t chameleon .
 ```
 
-## 🔬 Research Background
+### Run Commands
 
-This project is inspired by research on LLM robustness evaluation:
+```bash
+# Interactive shell
+docker run -it --rm \
+  -v $(pwd)/Projects:/app/Projects \
+  -e MISTRAL_API_KEY=$MISTRAL_API_KEY \
+  -e OPENAI_API_KEY=$OPENAI_API_KEY \
+  chameleon bash
 
-- **"Forget What You Know about LLMs Evaluations - LLMs are Like a Chameleon"** by Cohen-Inger et al. ([ArXiv:2502.07445v2](https://arxiv.org/html/2502.07445v2))
-- **MMLU Benchmark** by Hendrycks et al. ([ArXiv:2009.03300](https://arxiv.org/abs/2009.03300))
-
-### Key Findings from Original Chameleon Study
-
-- **18,200 questions** tested with **85.8% overall accuracy**
-- **15.4% performance drop** from baseline to maximum distortion (μ=0.9)
-- **Statistical significance**: All distortion levels showed highly significant degradation (p < 0.001)
-- **Domain-specific vulnerability**: Mathematical/logical subjects showed highest degradation (36-51%)
-
-## 📈 Example Results
-
-| μ Level | Accuracy | Degradation |
-|---------|----------|-------------|
-| 0.0     | 95.5%    | 0.0%        |
-| 0.3     | 89.6%    | 5.9%        |
-| 0.6     | 85.5%    | 10.0%       |
-| 0.9     | 80.9%    | 14.6%       |
+# Run specific command
+docker run --rm \
+  -v $(pwd)/Projects:/app/Projects \
+  chameleon python cli.py list
+```
 
 ## 🛠️ Development
 
 ```bash
-# Install development dependencies
+# Install dev dependencies
 pip install -e ".[dev]"
 
 # Run tests
@@ -215,20 +247,42 @@ pytest tests/
 # Format code
 black chameleon/
 ruff check chameleon/
+```
 
-# Type checking
-mypy chameleon/
+## 📄 Citation
+
+If you use Chameleon in your research, please cite:
+
+```bibtex
+@software{chameleon2024,
+  title={Chameleon: LLM Robustness Testing Framework},
+  author={Steve Solun},
+  year={2024},
+  url={https://github.com/stevesolun/Chameleon}
+}
+```
+
+**Foundational Work:**
+
+```bibtex
+@article{cohen2025forget,
+  title={Forget What You Know about LLMs Evaluations - LLMs are Like a Chameleon},
+  author={Cohen-Inger, Nurit and Elisha, Yehonatan and Shapira, Bracha and Rokach, Lior and Cohen, Seffi},
+  journal={arXiv preprint arXiv:2502.07445},
+  year={2025},
+  url={https://arxiv.org/abs/2502.07445}
+}
 ```
 
 ## 📄 License
 
-This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
+MIT License - see [LICENSE](LICENSE) for details.
 
 ## 🙏 Acknowledgments
 
-- OpenAI for GPT API access
-- Anthropic for Claude API access
-- MMLU benchmark creators for the dataset
+- [Mistral AI](https://mistral.ai/) for distortion generation
+- [OpenAI](https://openai.com/) for GPT evaluation
+- The authors of the original Chameleon research paper
 - The open-source ML community
 
 ---

@@ -15,6 +15,7 @@ from chameleon.analysis.visualizations import (
     create_accuracy_plots,
     create_key_insights_summary,
 )
+from chameleon.analysis.run_analysis import run_full_analysis
 
 __all__ = [
     "calculate_accuracy",
@@ -26,6 +27,7 @@ __all__ = [
     "create_degradation_heatmap",
     "create_accuracy_plots",
     "create_key_insights_summary",
+    "run_full_analysis",
 ]
 
 

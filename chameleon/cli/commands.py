@@ -1105,7 +1105,7 @@ def cmd_status(args):
 
 
 def cmd_analyze(args):
-    """Run analysis on project results."""
+    """Run comprehensive analysis on project results."""
     print_banner()
     
     project_name = args.project
@@ -1117,167 +1117,16 @@ def cmd_analyze(args):
         return 1
     
     try:
-        project = Project.load(project_path)
+        from chameleon.analysis import run_full_analysis
         
-        print(f"📊 Running analysis for project: {project_name}\n")
+        result = run_full_analysis(project_name, str(projects_dir))
         
-        # Try to load results data
-        try:
-            # First try distorted_data (which may have results merged)
-            df = project.load_distorted_data()
-        except FileNotFoundError:
-            try:
-                df = project.load_results()
-            except FileNotFoundError:
-                print("❌ No data files found. Add data to the project first.")
-                return 1
+        return 0 if result.get("status") == "complete" else 1
         
-        print(f"   Loaded {len(df)} records")
-        
-        # Standardize column names
-        from chameleon.cli.file_utils import standardize_distortion_data
-        df = standardize_distortion_data(df)
-        
-        # Check if we have the necessary columns
-        required_cols = ["is_correct", "miu", "subject"]
-        available_cols = [c for c in required_cols if c in df.columns]
-        missing_cols = [c for c in required_cols if c not in df.columns]
-        
-        if missing_cols:
-            print(f"   ⚠️ Missing columns for full analysis: {missing_cols}")
-            print("   Running basic analysis only.")
-            
-            # Basic analysis
-            if "is_correct" in df.columns:
-                accuracy = df["is_correct"].mean() * 100
-                print(f"\n   Overall Accuracy: {accuracy:.1f}%")
-            
-            return 0
-        
-        # Full analysis
-        from chameleon.analysis.metrics import calculate_accuracy_by_group, calculate_degradation
-        from chameleon.analysis.mcnemar import analyze_distortion_significance, analyze_subject_significance
-        from chameleon.analysis.reports import generate_statistical_report
-        
-        print("\n📈 Calculating metrics...")
-        
-        # Overall accuracy
-        overall_accuracy = df["is_correct"].mean() * 100
-        print(f"   Overall Accuracy: {overall_accuracy:.1f}%")
-        
-        # Accuracy by distortion level
-        level_accuracy = calculate_accuracy_by_group(df, "miu", is_correct_col="is_correct")
-        print(f"\n   Accuracy by Distortion Level:")
-        for _, row in level_accuracy.iterrows():
-            print(f"      μ={row['miu']:.1f}: {row['accuracy']*100:.1f}%")
-        
-        # McNemar tests
-        print("\n🔬 Running statistical tests...")
-        
-        distortion_results = analyze_distortion_significance(
-            df, 
-            baseline_col="miu", 
-            baseline_value=0.0,
-            is_correct_col="is_correct"
-        )
-        
-        subject_results = analyze_subject_significance(
-            df,
-            subject_col="subject",
-            baseline_col="miu",
-            baseline_value=0.0,
-            comparison_value=0.9,
-            is_correct_col="is_correct"
-        )
-        
-        # Save results
-        print("\n💾 Saving analysis results...")
-        
-        distortion_results.to_csv(project.analysis_dir / "mcnemar_distortion_results.csv", index=False)
-        subject_results.to_csv(project.analysis_dir / "mcnemar_subject_results.csv", index=False)
-        
-        # Generate report
-        report = generate_statistical_report(
-            distortion_results,
-            subject_results,
-            output_path=project.analysis_dir / "Statistical_Analysis_Report.md",
-            project_name=project_name
-        )
-        
-        # Generate visualizations
-        print("\n📊 Generating visualizations...")
-        
-        try:
-            from chameleon.analysis.visualizations import (
-                create_degradation_heatmap,
-                create_accuracy_plots,
-                create_key_insights_summary,
-                create_statistical_significance_plot,
-            )
-            
-            # Calculate performance data for visualizations
-            performance_data = []
-            for subject in df["subject"].unique():
-                baseline = df[(df["subject"] == subject) & (df["miu"] == 0.0)]
-                baseline_acc = baseline["is_correct"].mean() if len(baseline) > 0 else 0
-                
-                for miu in df["miu"].unique():
-                    subset = df[(df["subject"] == subject) & (df["miu"] == miu)]
-                    if len(subset) > 0:
-                        accuracy = subset["is_correct"].mean()
-                        degradation = (baseline_acc - accuracy) * 100
-                        performance_data.append({
-                            "subject": subject,
-                            "miu": miu,
-                            "accuracy": accuracy,
-                            "degradation": degradation,
-                        })
-            
-            import pandas as pd
-            performance_df = pd.DataFrame(performance_data)
-            
-            # Create plots
-            create_degradation_heatmap(
-                performance_df,
-                output_path=project.analysis_dir / "degradation_heatmap.png"
-            )
-            
-            create_accuracy_plots(
-                performance_df,
-                output_dir=project.analysis_dir,
-                prefix=""
-            )
-            
-            create_key_insights_summary(
-                performance_df,
-                output_path=project.analysis_dir / "key_insights_summary.png"
-            )
-            
-            if len(distortion_results) > 0:
-                create_statistical_significance_plot(
-                    distortion_results,
-                    output_path=project.analysis_dir / "statistical_significance.png"
-                )
-            
-            print("   ✅ Visualizations saved")
-            
-        except ImportError:
-            print("   ⚠️ Matplotlib/seaborn not available. Skipping visualizations.")
-        except Exception as e:
-            print(f"   ⚠️ Error creating visualizations: {e}")
-        
-        print(f"\n✅ Analysis complete!")
-        print(f"   Results saved to: {project.analysis_dir}")
-        
-        # Key findings
-        if len(subject_results) > 0:
-            most_vulnerable = subject_results.iloc[0]
-            print(f"\n🔍 Key Finding:")
-            print(f"   Most vulnerable subject: {most_vulnerable['subject_name']}")
-            print(f"   Degradation: {most_vulnerable['degradation_percent']:.1f}%")
-        
-        return 0
-        
+    except ImportError as e:
+        print(f"❌ Missing dependency: {e}")
+        print("   Install with: pip install matplotlib seaborn scipy statsmodels")
+        return 1
     except Exception as e:
         print(f"❌ Error during analysis: {e}")
         import traceback
@@ -1363,34 +1212,73 @@ def cmd_evaluate(args):
     target_model = config.get("target_model", {}).get("name", "gpt-4o")
     api_key_name = f"{target_vendor}_API_KEY"
     
-    # Check if API key exists
-    load_dotenv(env_path)
-    import os
-    api_key = os.getenv(api_key_name)
-    
-    if not api_key:
-        print(f"⚠️  {api_key_name} not found in project .env file")
-        print(f"   Target model: {target_vendor.lower()} / {target_model}")
-        print()
-        
-        # Prompt user for API key
-        api_key = input(f"Enter your {target_vendor} API key: ").strip()
+    def get_and_validate_key(env_path, api_key_name, target_vendor, target_model):
+        """Get API key and validate it works."""
+        import os
+        load_dotenv(env_path, override=True)
+        api_key = os.getenv(api_key_name)
         
         if not api_key:
-            print("❌ No API key provided. Evaluation cancelled.")
+            print(f"⚠️  {api_key_name} not found in project .env file")
+            print(f"   Target model: {target_vendor.lower()} / {target_model}")
+            print()
+            return None, False
+        
+        # Validate the key by making a test request
+        if target_vendor == "OPENAI":
+            try:
+                import openai
+                client = openai.OpenAI(api_key=api_key)
+                # Quick validation - list models (minimal API call)
+                client.models.list()
+                return api_key, True
+            except Exception as e:
+                error_msg = str(e)
+                if "401" in error_msg or "invalid_api_key" in error_msg:
+                    print(f"❌ Invalid {api_key_name} in .env file")
+                    print(f"   Error: API key is incorrect or expired")
+                    return api_key, False
+                elif "429" in error_msg:
+                    # Rate limited but key is valid
+                    return api_key, True
+                else:
+                    print(f"⚠️  Could not validate API key: {e}")
+                    return api_key, True  # Assume valid, let it fail later if not
+        
+        return api_key, True  # Non-OpenAI vendors, assume valid
+    
+    import os
+    api_key, is_valid = get_and_validate_key(env_path, api_key_name, target_vendor, target_model)
+    
+    # If no key or invalid key, prompt for new one
+    while not api_key or not is_valid:
+        print()
+        new_key = input(f"Enter your {target_vendor} API key (or 'q' to cancel): ").strip()
+        
+        if new_key.lower() == 'q':
+            print("❌ Evaluation cancelled.")
             return 1
+        
+        if not new_key:
+            print("❌ No API key provided.")
+            continue
         
         # Save to .env file
         if not env_path.exists():
             env_path.touch()
         
-        set_key(str(env_path), api_key_name, api_key)
+        set_key(str(env_path), api_key_name, new_key)
+        os.environ[api_key_name] = new_key
         print(f"✅ {api_key_name} saved to {env_path}")
-        print()
         
-        # Reload env
-        os.environ[api_key_name] = api_key
+        # Validate the new key
+        api_key, is_valid = get_and_validate_key(env_path, api_key_name, target_vendor, target_model)
+        
+        if is_valid:
+            print("✅ API key validated successfully!")
+            break
     
+    print()
     print(f"🎯 Running evaluation for project: {project_name}")
     print(f"   Target model: {target_vendor.lower()} / {target_model}")
     print()

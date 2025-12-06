@@ -251,42 +251,67 @@ BEGIN OUTPUT NOW:"""
 # Evaluation Prompt (for target model)
 # ============================================================================
 
-EVALUATION_SYSTEM_PROMPT = """You are an AI assistant answering multiple choice questions.
-Respond with ONLY the letter of the correct answer (A, B, C, or D).
-No explanations, no additional text, no reasoning shown."""
+EVALUATION_SYSTEM_PROMPT = """You are an expert exam-taker answering multiple choice questions.
+Your ONLY output is the letter(s) of the correct answer(s).
+NEVER explain, NEVER add text, NEVER show reasoning.
+If multiple answers: separate with comma (e.g., "A, D")."""
 
 
 def get_evaluation_prompt(question: str, choices: Dict[str, str]) -> str:
     """
     Generate a prompt for evaluating a question with the target model.
     
+    RLHF-style prompt with scoring incentive.
+    Handles both single (A, B, C, D) and multiple answer questions (A, D).
+    
     Args:
         question: The (possibly distorted) question text
         choices: Dict mapping letters to choice text, e.g. {"A": "...", "B": "..."}
+                 Keys can be lowercase or uppercase (treated the same)
     
     Returns:
         Formatted prompt string
     """
-    choices_text = "\n".join([f"{k}: {v}" for k, v in choices.items()])
+    # Normalize keys to uppercase for consistent display
+    normalized_choices = {}
+    for k, v in choices.items():
+        key = k.strip().upper() if isinstance(k, str) else str(k).upper()
+        # Handle keys like "A:" or "a:" - extract just the letter
+        if key.endswith(':'):
+            key = key[:-1]
+        if len(key) == 1 and key in 'ABCDEFGH':
+            normalized_choices[key] = v
     
-    return f"""EVALUATION TASK: You will receive +1 point for each correct answer and -2 points for any incorrect choice. Your goal is to maximize your score.
+    # Sort and format choices
+    choices_text = "\n".join([f"{k}: {v}" for k, v in sorted(normalized_choices.items())])
+    
+    return f"""═══════════════════════════════════════════════════════════════════════
+MEDICAL CERTIFICATION EXAMINATION
+═══════════════════════════════════════════════════════════════════════
 
-INSTRUCTIONS:
-- Read the question carefully
-- Analyze all options (A, B, C, D)
-- Select the correct answer(s) - there may be one or more correct answers
-- Respond with ONLY the letter(s) separated by comma if multiple (e.g., "A" or "A, D")
-- Order does not matter for multiple answers
-- No explanations, no additional text, no reasoning shown
-- Wrong answers result in -2 points, correct answers give +1 point
+SCORING SYSTEM:
+• Correct answer: +1 point
+• Incorrect answer: -2 points penalty
+• Your goal: Maximize total score
 
+RULES:
+1. Read the question VERY carefully
+2. Analyze ALL options before answering
+3. There may be ONE or MULTIPLE correct answers
+4. Respond with ONLY the letter(s)
+5. For multiple answers: use comma (e.g., "A, D" or "B, C")
+6. Order does NOT matter (A, D = D, A)
+7. NO explanations, NO reasoning, NO additional text
+
+═══════════════════════════════════════════════════════════════════════
 QUESTION:
 {question}
 
 OPTIONS:
 {choices_text}
+═══════════════════════════════════════════════════════════════════════
 
-Your answer (letter(s) only):"""
+YOUR ANSWER (letter(s) only):"""
 
 
 # ============================================================================

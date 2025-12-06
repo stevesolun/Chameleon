@@ -97,8 +97,8 @@ class BatchProcessor:
         self.config = config
         self.client = openai.OpenAI(api_key=config.api_key)
         
-        # Directories
-        self.batch_dir = config.project_dir / "batches"
+        # Directories - use eval_batches/ for OpenAI batch files (separate from distortion batches)
+        self.batch_dir = config.project_dir / "eval_batches"
         self.jsonl_dir = self.batch_dir / "requests"
         self.results_dir = self.batch_dir / "results"
         self.tracking_dir = self.batch_dir / "tracking"
@@ -108,12 +108,26 @@ class BatchProcessor:
         
         self.tracking_file = self.tracking_dir / "batch_info.json"
         
-        # Final results directory (not distorted_data)
+        # Final results directory
         self.final_results_dir = config.project_dir / "results"
         self.final_results_dir.mkdir(parents=True, exist_ok=True)
         
         # Cache for tier info
         self._tier_info = None
+    
+    def cleanup_batch_files(self):
+        """
+        Remove batch files after successful completion.
+        Keeps the eval_batches folder structure clean.
+        """
+        import shutil
+        
+        try:
+            if self.batch_dir.exists():
+                shutil.rmtree(self.batch_dir)
+                print(f"🧹 Cleaned up batch files: {self.batch_dir}")
+        except Exception as e:
+            logger.warning(f"Could not cleanup batch files: {e}")
     
     def get_available_models(self) -> List[str]:
         """
@@ -723,6 +737,65 @@ class BatchProcessor:
         if all_results:
             self._update_csv_with_results(all_results, timestamp)
     
+    def _normalize_answer(self, answer: str) -> set:
+        """
+        Normalize an answer string to a set of uppercase letters.
+        
+        Handles:
+        - Single: "A", "a", "A.", "a:"
+        - Multiple: "A, D", "A,D", "a d", "A D", "D, A" -> same set
+        - Case-insensitive: "a" == "A"
+        - Order-independent: "A, D" == "D, A"
+        
+        Args:
+            answer: The answer string from model or ground truth
+        
+        Returns:
+            Set of uppercase letters (e.g., {'A', 'D'})
+        """
+        if not answer or pd.isna(answer):
+            return set()
+        
+        # Convert to string and uppercase
+        answer_str = str(answer).upper()
+        
+        # Remove common separators and punctuation
+        for char in [',', '.', ':', ';', '(', ')', '[', ']', '{', '}', '"', "'"]:
+            answer_str = answer_str.replace(char, ' ')
+        
+        # Extract only valid answer letters
+        valid_letters = {'A', 'B', 'C', 'D', 'E', 'F', 'G', 'H'}
+        letters = set()
+        
+        for token in answer_str.split():
+            token = token.strip()
+            if len(token) == 1 and token in valid_letters:
+                letters.add(token)
+        
+        return letters
+    
+    def _check_correctness(self, model_answer: str, correct_answer: str) -> bool:
+        """
+        Check if model answer is correct using set comparison.
+        
+        Order-independent: "A, D" == "D, A" -> True
+        Case-insensitive: "a" == "A" -> True
+        
+        Args:
+            model_answer: The answer from the target model
+            correct_answer: The ground truth answer
+        
+        Returns:
+            True if answers match (same set of letters)
+        """
+        model_set = self._normalize_answer(model_answer)
+        correct_set = self._normalize_answer(correct_answer)
+        
+        if not model_set or not correct_set:
+            return False
+        
+        return model_set == correct_set
+    
     def _update_csv_with_results(self, results: Dict[str, str], timestamp: str):
         """Update the distortions CSV with model answers."""
         csv_path = self.config.project_dir / "distorted_data" / "distortions_complete.csv"
@@ -744,6 +817,7 @@ class BatchProcessor:
         
         matched = 0
         valid_answers = 0
+        correct_count = 0
         
         # Parse custom_id format: {question_id}__d{distortion_id}__miu{miu}__idx{idx}
         for custom_id, answer in results.items():
@@ -761,21 +835,26 @@ class BatchProcessor:
                 if idx is None or idx >= len(df):
                     continue
                 
+                # Clean the model answer (remove any extra whitespace)
+                cleaned_answer = str(answer).strip().upper() if answer else ''
+                
                 # Update the row
-                df.at[idx, 'target_model_answer'] = answer
+                df.at[idx, 'target_model_answer'] = cleaned_answer
                 df.at[idx, 'target_model_name'] = self.config.model
                 matched += 1
                 
-                # Check correctness (handle both 'answer' and 'correct_answer' columns)
-                # Supports multiple answers like "A, D" or "A,D"
-                answer_letters = set(x.strip().upper() for x in str(answer).replace(',', ' ').split() if x.strip().upper() in ['A', 'B', 'C', 'D'])
+                # Get ground truth answer
+                correct = df.at[idx, 'answer'] if 'answer' in df.columns else df.at[idx, 'correct_answer']
                 
-                if answer_letters:
+                # Normalize and compare
+                model_letters = self._normalize_answer(cleaned_answer)
+                
+                if model_letters:
                     valid_answers += 1
-                    correct = df.at[idx, 'answer'] if 'answer' in df.columns else df.at[idx, 'correct_answer']
-                    correct_letters = set(x.strip().upper() for x in str(correct).replace(',', ' ').split() if x.strip().upper() in ['A', 'B', 'C', 'D'])
-                    # Correct if the sets match (order doesn't matter)
-                    df.at[idx, 'is_correct'] = (answer_letters == correct_letters)
+                    is_correct = self._check_correctness(cleaned_answer, correct)
+                    df.at[idx, 'is_correct'] = is_correct
+                    if is_correct:
+                        correct_count += 1
                 else:
                     df.at[idx, 'is_correct'] = False
                     
@@ -783,33 +862,32 @@ class BatchProcessor:
                 logger.warning(f"Error processing result {custom_id}: {e}")
                 continue
         
-        # Save results
-        output_csv = self.config.project_dir / "distorted_data" / f"evaluation_results_{timestamp}.csv"
-        df.to_csv(output_csv, index=False, encoding='utf-8')
-        
-        # Also update the main complete file
+        # Update the distortions_complete.csv with answers (for consistency)
         complete_csv = self.config.project_dir / "distorted_data" / "distortions_complete.csv"
         df.to_csv(complete_csv, index=False, encoding='utf-8')
         
-        print(f"💾 Results saved: {output_csv}")
-        print(f"🔗 Matched: {matched}/{len(df)} ({matched*100/len(df):.1f}%)")
+        # Save final results to results/results.csv
+        final_csv = self.final_results_dir / "results.csv"
+        df.to_csv(final_csv, index=False, encoding='utf-8')
+        
+        print(f"💾 Results saved to: {final_csv}")
+        print(f"\n🔗 Matched: {matched}/{len(df)} ({matched*100/len(df):.1f}%)")
         print(f"✅ Valid answers: {valid_answers}/{matched if matched > 0 else 1}")
         
         # Performance analysis
         if valid_answers > 0:
-            valid_df = df[df['target_model_answer'].isin(['A', 'B', 'C', 'D'])]
-            if len(valid_df) > 0:
-                accuracy = valid_df['is_correct'].mean() * 100
-                print(f"\n📈 Model Performance: {accuracy:.1f}% accuracy")
-                
-                # By miu
-                if 'miu' in df.columns:
-                    print("\n📊 Accuracy by μ:")
-                    for miu in sorted(df['miu'].unique()):
-                        subset = valid_df[valid_df['miu'] == miu]
-                        if len(subset) > 0:
-                            miu_acc = subset['is_correct'].mean() * 100
-                            print(f"   μ={miu:.1f}: {miu_acc:.1f}% ({len(subset)} questions)")
+            accuracy = correct_count * 100 / valid_answers
+            print(f"\n📈 Model Performance: {accuracy:.1f}% accuracy ({correct_count}/{valid_answers})")
+            
+            # By miu
+            if 'miu' in df.columns:
+                print("\n📊 Accuracy by μ:")
+                for miu in sorted(df['miu'].unique()):
+                    subset = df[(df['miu'] == miu) & (df['is_correct'].notna())]
+                    if len(subset) > 0:
+                        miu_correct = subset['is_correct'].sum()
+                        miu_acc = miu_correct * 100 / len(subset)
+                        print(f"   μ={miu:.1f}: {miu_acc:.1f}% ({miu_correct}/{len(subset)} correct)")
     
     def _load_tracking(self) -> List[Dict]:
         """Load batch tracking data."""
@@ -843,6 +921,18 @@ def run_evaluation(project_name: str, projects_dir: str = "Projects", skip_confi
     """
     Run the complete evaluation workflow with tier detection and cost confirmation.
     
+    Interactive workflow:
+    1. Load distortions_complete.csv
+    2. Fill target_model_name column
+    3. Check user's OpenAI tier and calculate max batch size
+    4. Split requests into optimal batches (e.g., 50k + 10k for 60k requests)
+    5. Show cost estimate and ask for confirmation
+    6. Submit batches to OpenAI Batch API
+    7. Monitor progress and download results
+    8. Populate target_model_answer column
+    9. Smart comparison: is_correct = (normalized model answer == normalized correct answer)
+    10. Save final results to results/results.csv
+    
     Args:
         project_name: Name of the project
         projects_dir: Base directory for projects
@@ -851,73 +941,248 @@ def run_evaluation(project_name: str, projects_dir: str = "Projects", skip_confi
     Returns:
         Summary dict
     """
+    print("\n" + "═" * 60)
+    print("🎯 CHAMELEON EVALUATION PIPELINE")
+    print("═" * 60)
+    
     config = EvaluationConfig.from_project(project_name, projects_dir)
     processor = BatchProcessor(config)
     
+    print(f"\n📁 Project: {project_name}")
+    print(f"🤖 Target Model: {config.model}")
+    
     # Step 0: Detect tier and get limits
+    print("\n" + "-" * 40)
+    print("STEP 0: Detecting OpenAI Account Tier")
+    print("-" * 40)
+    
     tier_info = processor.detect_tier_and_limits()
     
     if not tier_info.get("batch_api_accessible"):
-        print(f"\n❌ Batch API not accessible: {tier_info.get('error')}")
+        print(f"\n❌ Batch API not accessible: {tier_info.get('batch_api_error', 'Unknown error')}")
         return {"status": "error", "message": "Batch API not accessible"}
     
-    # Load data to count requests
-    df = processor._load_distorted_data()
+    # Step 1: Load and analyze data
+    print("\n" + "-" * 40)
+    print("STEP 1: Loading Distortions Data")
+    print("-" * 40)
     
-    # Filter to rows that need evaluation
-    needs_eval = df[df['target_model_answer'].isna() | (df['target_model_answer'] == '')]
+    df = processor._load_distorted_data()
+    total_rows = len(df)
+    
+    # Validate required columns
+    required_cols = ['question_id', 'distortion_id', 'distorted_question', 'miu', 'options_json', 'answer']
+    missing_cols = [c for c in required_cols if c not in df.columns]
+    if missing_cols:
+        print(f"❌ Missing required columns: {missing_cols}")
+        return {"status": "error", "message": f"Missing columns: {missing_cols}"}
+    
+    print(f"✅ Loaded {total_rows:,} rows")
+    print(f"   Columns: {list(df.columns)}")
+    
+    # Check what needs evaluation
+    if 'target_model_answer' not in df.columns:
+        df['target_model_answer'] = ''
+    
+    needs_eval_mask = df['target_model_answer'].isna() | (df['target_model_answer'] == '')
+    needs_eval = df[needs_eval_mask]
     num_requests = len(needs_eval)
+    already_done = total_rows - num_requests
+    
+    print(f"\n📊 Evaluation Status:")
+    print(f"   Total questions: {total_rows:,}")
+    print(f"   Already evaluated: {already_done:,}")
+    print(f"   Need evaluation: {num_requests:,}")
     
     if num_requests == 0:
         print("\n✅ All questions already evaluated!")
-        return {"status": "complete", "message": "Already complete"}
+        
+        # Still generate results file
+        final_csv = processor.final_results_dir / "results.csv"
+        df.to_csv(final_csv, index=False, encoding='utf-8')
+        print(f"📁 Results saved to: {final_csv}")
+        
+        return {"status": "complete", "message": "Already complete", "results_file": str(final_csv)}
     
-    # Calculate batch count
-    max_per_batch = tier_info["max_requests_per_batch"]
-    num_batches = (num_requests + max_per_batch - 1) // max_per_batch
+    # Step 2: Validate data before submission
+    print("\n" + "-" * 40)
+    print("STEP 2: Validating Data for Submission")
+    print("-" * 40)
     
-    # Step 1: Estimate cost and confirm
+    validation_errors = []
+    
+    # Check each row that needs evaluation
+    for idx, row in needs_eval.head(100).iterrows():  # Sample first 100
+        q_id = row.get('question_id', 'MISSING')
+        d_id = row.get('distortion_id', 'MISSING')
+        question = row.get('distorted_question', '')
+        options = row.get('options_json', '')
+        miu = row.get('miu', -1)
+        answer = row.get('answer', '')
+        
+        if not question or pd.isna(question):
+            validation_errors.append(f"Row {idx}: Missing distorted_question")
+        if not options or pd.isna(options):
+            validation_errors.append(f"Row {idx}: Missing options_json")
+        if miu < 0 or pd.isna(miu):
+            validation_errors.append(f"Row {idx}: Invalid miu value")
+        if not answer or pd.isna(answer):
+            validation_errors.append(f"Row {idx}: Missing answer")
+    
+    if validation_errors:
+        print(f"⚠️  Found {len(validation_errors)} validation issues (showing first 10):")
+        for err in validation_errors[:10]:
+            print(f"   • {err}")
+        if len(validation_errors) > 10:
+            print(f"   ... and {len(validation_errors) - 10} more")
+        
+        if not skip_confirmation:
+            choice = input("\nContinue anyway? (y/n): ").strip().lower()
+            if choice != 'y':
+                return {"status": "cancelled", "message": "Cancelled due to validation errors"}
+    else:
+        print("✅ All sampled rows passed validation")
+    
+    # Step 3: Calculate optimal batch sizes
+    print("\n" + "-" * 40)
+    print("STEP 3: Calculating Optimal Batch Sizes")
+    print("-" * 40)
+    
+    max_per_batch = tier_info.get("max_requests_per_batch", 50000)
+    num_batches = math.ceil(num_requests / max_per_batch)
+    
+    print(f"   Max requests per batch: {max_per_batch:,}")
+    print(f"   Total requests: {num_requests:,}")
+    print(f"   Batches needed: {num_batches}")
+    
+    # Show batch breakdown
+    print(f"\n   Batch breakdown:")
+    remaining = num_requests
+    for i in range(num_batches):
+        batch_size = min(max_per_batch, remaining)
+        print(f"      Batch {i+1}: {batch_size:,} requests")
+        remaining -= batch_size
+    
+    # Step 4: Cost estimate and confirmation
+    print("\n" + "-" * 40)
+    print("STEP 4: Cost Estimation")
+    print("-" * 40)
+    
     cost_estimate = processor.estimate_cost(num_requests)
     
     if not skip_confirmation:
         if not processor.confirm_submission(num_requests, num_batches, cost_estimate, tier_info):
             return {"status": "cancelled", "message": "Cancelled by user"}
     
-    # Step 2: Create batches (with optimized size)
+    # Step 5: Create batches
+    print("\n" + "-" * 40)
+    print("STEP 5: Creating Batch Files")
+    print("-" * 40)
+    
     processor.config.max_requests_per_batch = max_per_batch
     batch_files = processor.create_batches()
     
     if not batch_files:
         return {"status": "error", "message": "No batch files created"}
     
-    # Step 3: Submit
+    # Step 6: Submit batches
+    print("\n" + "-" * 40)
+    print("STEP 6: Submitting to OpenAI Batch API")
+    print("-" * 40)
+    
     if not processor.submit_batches(interactive=False):
         return {"status": "error", "message": "Failed to submit batches"}
     
-    # Step 4: Monitor until complete
-    print("\n⏳ Monitoring batches (checking every 5 minutes)...")
+    # Step 7: Monitor until complete
+    print("\n" + "-" * 40)
+    print("STEP 7: Monitoring Batch Progress")
+    print("-" * 40)
+    print("⏳ Checking every 60 seconds...")
+    
+    check_interval = 60  # 1 minute
     
     while True:
         if processor.monitor():
             break
-        print("\n⏳ Still processing... checking again in 5 minutes")
-        time.sleep(300)
+        print(f"\n⏳ Still processing... checking again in {check_interval} seconds")
+        time.sleep(check_interval)
     
-    # Step 5: Save final results to results/ folder
-    print("\n📁 Saving final results...")
-    final_results_path = processor.final_results_dir / f"evaluation_results_{datetime.now().strftime('%Y%m%d_%H%M%S')}.csv"
+    # Step 8: Save final results
+    print("\n" + "-" * 40)
+    print("STEP 8: Saving Final Results")
+    print("-" * 40)
     
-    # Copy final data to results folder
+    final_results_path = processor.final_results_dir / "results.csv"
+    
+    # Load updated data with answers
     final_df = processor._load_distorted_data()
+    
+    # Ensure all required columns are filled
+    if 'target_model_name' not in final_df.columns:
+        final_df['target_model_name'] = config.model
+    final_df['target_model_name'] = final_df['target_model_name'].fillna(config.model)
+    
+    # Save to results folder
     final_df.to_csv(final_results_path, index=False, encoding='utf-8')
-    print(f"✅ Results saved to: {final_results_path}")
+    
+    # Calculate final statistics
+    valid_answers = final_df[final_df['target_model_answer'].notna() & (final_df['target_model_answer'] != '')]
+    correct_count = valid_answers['is_correct'].sum() if 'is_correct' in valid_answers.columns else 0
+    
+    print(f"\n✅ Evaluation Complete!")
+    print(f"   Results saved to: {final_results_path}")
+    print(f"   Total evaluated: {len(valid_answers):,}")
+    print(f"   Correct answers: {correct_count:,}")
+    if len(valid_answers) > 0:
+        print(f"   Overall accuracy: {correct_count * 100 / len(valid_answers):.1f}%")
+    
+    # Step 9: Cleanup batch files
+    print("\n" + "-" * 40)
+    print("STEP 9: Cleanup")
+    print("-" * 40)
+    
+    processor.cleanup_batch_files()
+    print("✅ Batch files cleaned up")
+    
+    # Final summary
+    print("\n" + "═" * 60)
+    print("📊 FINAL SUMMARY")
+    print("═" * 60)
+    print(f"   Project: {project_name}")
+    print(f"   Model: {config.model}")
+    print(f"   Questions evaluated: {len(valid_answers):,}")
+    print(f"   Accuracy: {correct_count * 100 / len(valid_answers):.1f}%" if len(valid_answers) > 0 else "   Accuracy: N/A")
+    print(f"\n   📁 Results file: {final_results_path}")
+    print(f"   Columns: target_model_name, target_model_answer, is_correct")
+    print("═" * 60)
+    
+    # Offer analysis option
+    print("\n")
+    choice = input("📊 Run analysis now? (Y/n): ").strip().lower()
+    
+    if choice != 'n':
+        print("\n🔬 Starting analysis...")
+        try:
+            from chameleon.analysis import run_full_analysis
+            analysis_result = run_full_analysis(project_name, projects_dir)
+            
+            if analysis_result.get("status") == "complete":
+                print(f"\n✅ Analysis complete!")
+                print(f"   Output: {analysis_result.get('output_dir')}")
+                print(f"   Executive Report: {projects_dir}/{project_name}/results/Executive_Report.md")
+        except Exception as e:
+            print(f"\n⚠️ Analysis error: {e}")
+            print(f"   You can run analysis later with: python cli.py analyze --project {project_name}")
+    else:
+        print(f"\n💡 Run analysis later with: python cli.py analyze --project {project_name}")
     
     return {
         "status": "complete",
         "requests": num_requests,
         "batches": num_batches,
         "cost_estimate": cost_estimate,
-        "results_file": str(final_results_path)
+        "results_file": str(final_results_path),
+        "accuracy": correct_count * 100 / len(valid_answers) if len(valid_answers) > 0 else 0
     }
 
 
