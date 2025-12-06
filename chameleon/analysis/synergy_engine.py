@@ -91,15 +91,21 @@ def load_and_prepare(csv_path: Path, validated_only: bool = False) -> pd.DataFra
     else:
         df["llm_validated"] = True
     
-    # Ensure target_model_name exists
+    # Ensure target_model_name exists and is valid
     if "target_model_name" not in df.columns:
         df["target_model_name"] = "unknown"
+    else:
+        # Convert to string and handle NaN/empty values
+        df["target_model_name"] = df["target_model_name"].astype(str)
+        # Filter out rows with invalid model names
+        invalid_models = ["nan", "None", "", "NaN", "null"]
+        df = df[~df["target_model_name"].isin(invalid_models)].copy()
     
     # Ensure subject exists
     if "subject" not in df.columns:
         df["subject"] = "General"
     
-    # Drop invalid rows
+    # Drop invalid rows (missing miu)
     df = df.dropna(subset=["miu"])
     
     # Filter validated only if requested

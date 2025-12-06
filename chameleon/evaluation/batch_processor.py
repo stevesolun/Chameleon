@@ -862,6 +862,10 @@ class BatchProcessor:
                 logger.warning(f"Error processing result {custom_id}: {e}")
                 continue
         
+        # Ensure ALL rows have target_model_name populated (fix for any missed rows)
+        df['target_model_name'] = df['target_model_name'].fillna(self.config.model)
+        df.loc[df['target_model_name'] == '', 'target_model_name'] = self.config.model
+        
         # Update the distortions_complete.csv with answers (for consistency)
         complete_csv = self.config.project_dir / "distorted_data" / "distortions_complete.csv"
         df.to_csv(complete_csv, index=False, encoding='utf-8')
