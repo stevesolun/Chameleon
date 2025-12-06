@@ -86,12 +86,7 @@ Follow the interactive prompts to configure:
 
 ### 2. Upload Your Data
 
-When prompted, provide CSV files with questions. Required columns:
-- `question_text` - The question
-- `options_json` - Answer options as JSON (e.g., `{"A": "...", "B": "..."}`)
-- `answer` - Correct answer(s) (e.g., "A" or "A, D")
-
-Optional: `subject`, `question_id`
+When prompted, provide CSV files with questions. See [Data Formats](#-data-formats) below for details.
 
 ### 3. Generate Distortions
 
@@ -169,15 +164,45 @@ Chameleon/
 | 0.7-0.8 | Heavy | Major paraphrasing |
 | 0.9 | Full | Complete reconstruction |
 
-## 📈 Output
+## 📈 Analysis Output
 
-After running analysis, you get:
+After running `python cli.py analyze --project YourProject`, you get **30+ files** including:
 
-- **Visualizations**: Accuracy plots, degradation heatmaps, statistical significance charts
-- **Statistics**: McNemar's test results, confidence intervals, per-subject breakdown
-- **Reports**: `Executive_Report.md` with full analysis and findings
+### Core Metrics
+| File | Description |
+|------|-------------|
+| `01_accuracy_by_miu.png` | Accuracy curve showing degradation across μ levels |
+| `02_accuracy_by_subject_miu.csv` | Per-subject breakdown at each distortion level |
+| `03_chameleon_robustness_index.csv` | **CRI scores** - weighted robustness metric |
+| `04_elasticity.png` | Linear regression showing degradation rate |
+| `05_model_comparison.csv` | Head-to-head model comparison |
 
-All outputs are saved to `Projects/YourProject/results/`
+### Error Analysis
+| File | Description |
+|------|-------------|
+| `06_error_taxonomy.json` | Classification of error types (blank, wrong choice, invalid) |
+| `07_confusion_clusters.json` | TF-IDF clustering of failure patterns |
+
+### Statistical Analysis
+| File | Description |
+|------|-------------|
+| `08_bootstrap_intervals.csv` | 95% confidence intervals |
+| McNemar test CSVs | Statistical significance of degradation |
+
+### Advanced Analysis
+| File | Description |
+|------|-------------|
+| `09_delta_accuracy_heatmap.png` | Subject × μ degradation visualization |
+| `10_question_difficulty_tiers.json` | Easy/Medium/Hard/**Chameleon Breakers** |
+| `11_executive_summary.md` | **Start here** - comprehensive findings report |
+
+### Key Metrics Explained
+
+- **CRI (Chameleon Robustness Index)**: Weighted accuracy emphasizing high-μ performance. Higher = more robust.
+- **Elasticity Slope**: How fast accuracy drops per μ increase. Closer to 0 = more robust.
+- **Chameleon Breakers**: Questions where model succeeds at μ=0 but fails catastrophically at high μ - evidence of surface pattern matching rather than true understanding.
+
+All outputs saved to `Projects/YourProject/results/` and `results/synergy_analysis/`
 
 ## 🐳 Docker Usage
 
@@ -192,6 +217,70 @@ docker run -it --rm \
   -e OPENAI_API_KEY=$OPENAI_API_KEY \
   chameleon python cli.py init
 ```
+
+## 📋 Data Formats
+
+Chameleon works with **closed-answer multiple-choice questions** in CSV format.
+
+### Input Format (Original Data)
+
+Your source data should have these columns:
+
+| Column | Required | Description |
+|--------|----------|-------------|
+| `subject` | Optional | Category/topic (e.g., "Biology", "History") |
+| `question` | **Yes** | The question text |
+| `answer_options` | **Yes** | JSON object with options: `{"A": "...", "B": "...", "C": "...", "D": "..."}` |
+| `correct_answer` | **Yes** | Correct answer letter(s): `"A"` or `"A, D"` for multiple |
+| `question_id` | Optional | Unique identifier (auto-generated if missing) |
+
+**Example:**
+```csv
+subject,question,answer_options,correct_answer,question_id
+Biology,"What is the powerhouse of the cell?","{""A"": ""Nucleus"", ""B"": ""Mitochondria"", ""C"": ""Ribosome"", ""D"": ""Golgi""}",B,BIO_001
+```
+
+### Output Format (Results)
+
+The full results CSV includes all processing columns:
+
+| Column | Description |
+|--------|-------------|
+| `subject` | Category/topic |
+| `question_id` | Unique question identifier |
+| `question_text` | Original question |
+| `options_json` | Answer options as JSON |
+| `distorted_question` | Paraphrased version (or original if μ=0) |
+| `distortion_id` | Unique ID: `{question_id}_d{N}_m{miu}` |
+| `miu` | Distortion level (0.0 - 0.9) |
+| `answer` | Correct answer(s) |
+| `target_model_name` | Model evaluated (e.g., "gpt-5.1") |
+| `target_model_answer` | Model's response |
+| `is_correct` | Whether model answered correctly |
+
+## 💡 Tips
+
+### Using Local Models for Distortion
+
+By default, Chameleon uses **Mistral API** for distortion generation (recommended). However, you can configure local models during project setup.
+
+> ⚠️ **Hardware Requirements for Local Models**
+> 
+> Running local LLMs requires significant computational resources:
+> - **GPU**: NVIDIA GPU with 8GB+ VRAM recommended (16GB+ for larger models)
+> - **RAM**: 16GB+ system memory
+> - **Storage**: 10-50GB for model weights
+> - **Time**: Local inference is significantly slower than API calls
+> 
+> If you don't have a powerful workstation, stick with the API option. It's faster and more reliable for large datasets.
+
+### Multiple Correct Answers
+
+Chameleon supports questions with multiple correct answers. Use comma-separated letters:
+- Single answer: `"B"`
+- Multiple answers: `"A, D"` (order doesn't matter, case-insensitive)
+
+The evaluation uses smart comparison: `"A, D"` equals `"D, A"` equals `"a,d"`.
 
 ## 📄 Citation
 

@@ -16,6 +16,7 @@ from chameleon.analysis.visualizations import (
     create_key_insights_summary,
 )
 from chameleon.analysis.run_analysis import run_full_analysis
+from chameleon.analysis.synergy_engine import run_synergy_analysis
 
 __all__ = [
     "calculate_accuracy",
@@ -28,6 +29,7 @@ __all__ = [
     "create_accuracy_plots",
     "create_key_insights_summary",
     "run_full_analysis",
+    "run_synergy_analysis",
 ]
 
 

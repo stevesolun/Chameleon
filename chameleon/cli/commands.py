@@ -729,7 +729,7 @@ def cmd_init(args):
                     "anthropic": ["claude-3-5-sonnet-20241022", "claude-3-opus-20240229"],
                     "google": ["gemini-1.5-pro", "gemini-1.5-flash"],
                     "mistral": ["mistral-large-latest", "mistral-medium"],
-                    "local": ["mistral-7b-instruct", "llama-3-8b"],
+                    "local": ["mistral-7b-instruct-v0.3", "llama-3.1-8b", "phi-3-mini"],
                     "ollama": ["llama3", "mistral", "codellama"],
                 }
                 suggestions = model_suggestions.get(vendor, ["custom"])
@@ -1019,25 +1019,119 @@ def cmd_list(args):
             print(f"   {status_icon} {name} (Error: {project['error']})")
         else:
             config = project.get("config", {})
-            modality = config.get("modality", "unknown")
-            model = config.get("model_name", "unknown")
-            backend = config.get("backend_type", "unknown")
+            project_path = projects_dir / name
             
+            # Target model info (check both formats for backwards compatibility)
+            target_model = config.get("target_model", {})
+            target_vendor = target_model.get("vendor", config.get("backend_type", "unknown"))
+            target_name = target_model.get("name", config.get("model_name", "unknown"))
+            
+            # Distortion model info (check both distortion_config and distortion keys)
+            distortion = config.get("distortion_config", config.get("distortion", {}))
+            distortion_engine = distortion.get("engine", {})
+            distortion_model = distortion_engine.get("model_name", "mistral-large-latest")
+            distortion_vendor = distortion_engine.get("vendor", "mistral")
+            miu_values = distortion.get("miu_values", [])
+            dpq = distortion.get("distortions_per_question", 10)
+            
+            # Format miu values nicely
+            if miu_values:
+                miu_str = ", ".join([str(m) for m in miu_values])
+            else:
+                miu_str = "N/A"
+            
+            print(f"\n{'='*70}")
             print(f"   {status_icon} {name}")
-            print(f"      Modality: {modality} | Model: {model} | Backend: {backend}")
+            print(f"{'='*70}")
             
-            files = project.get("files", {})
-            if files:
-                file_counts = []
-                for dir_name, counts in files.items():
-                    total = sum(counts.values()) if counts else 0
-                    if total > 0:
-                        file_counts.append(f"{dir_name}: {total}")
-                if file_counts:
-                    print(f"      Files: {', '.join(file_counts)}")
+            # ── Configuration Metadata ──
+            print(f"\n   ┌─ Configuration")
+            print(f"   │  📂 Path: {project_path}")
+            print(f"   │  📝 Description: {config.get('description', 'N/A')}")
+            print(f"   │  🎨 Modality: {config.get('modality', 'text')}")
+            print(f"   │")
+            print(f"   │  🎯 Target Model")
+            print(f"   │     • Vendor: {target_vendor}")
+            print(f"   │     • Model: {target_name}")
+            print(f"   │")
+            engine_type = distortion_engine.get('engine_type', 'api')
+            print(f"   │  🔀 Distortion Engine")
+            print(f"   │     • Type: {engine_type.upper()}")
+            print(f"   │     • Model: {distortion_vendor}/{distortion_model}")
+            if engine_type == "local":
+                # Only show local-specific settings for local engine
+                print(f"   │     • Max Workers: {distortion_engine.get('max_workers', 4)}")
+                print(f"   │     • Batch Size: {distortion_engine.get('batch_size', 8)}")
+                if distortion_engine.get('model_path'):
+                    print(f"   │     • Model Path: {distortion_engine.get('model_path')}")
+            print(f"   │")
+            print(f"   │  📊 Distortion Settings")
+            print(f"   │     • Miu Values: [{miu_str}]")
+            print(f"   │     • Distortions/Question: {dpq}")
+            print(f"   │")
+            
+            # Metadata
+            metadata = config.get('metadata', {})
+            if metadata:
+                print(f"   │  🕐 Metadata")
+                print(f"   │     • Created: {metadata.get('created_at', 'N/A')}")
+                print(f"   │     • Updated: {metadata.get('updated_at', 'N/A')}")
+                print(f"   │     • Version: {metadata.get('version', 'N/A')}")
+                print(f"   │")
+            
+            print(f"   └─────────────────────────────────")
+            
+            # ── Full Directory Tree ──
+            print(f"\n   ┌─ Directory Structure")
+            _print_tree(project_path, prefix="   │  ")
+            print(f"   └─────────────────────────────────")
+            
             print()
     
     return 0
+
+
+def _print_tree(directory: Path, prefix: str = "", is_last: bool = True, max_depth: int = 4, current_depth: int = 0):
+    """Print directory tree recursively."""
+    if current_depth > max_depth:
+        return
+    
+    if not directory.exists():
+        return
+    
+    # Get all items, excluding hidden files and __pycache__
+    items = sorted([
+        item for item in directory.iterdir() 
+        if not item.name.startswith('.') and item.name != '__pycache__'
+    ], key=lambda x: (x.is_file(), x.name.lower()))
+    
+    for i, item in enumerate(items):
+        is_last_item = (i == len(items) - 1)
+        connector = "└── " if is_last_item else "├── "
+        
+        if item.is_file():
+            # Get file size
+            size = item.stat().st_size
+            if size < 1024:
+                size_str = f"{size} B"
+            elif size < 1024 * 1024:
+                size_str = f"{size / 1024:.1f} KB"
+            else:
+                size_str = f"{size / (1024 * 1024):.1f} MB"
+            
+            print(f"{prefix}{connector}📄 {item.name} ({size_str})")
+        else:
+            # Count items in subdirectory
+            try:
+                subitem_count = len(list(item.iterdir()))
+            except PermissionError:
+                subitem_count = "?"
+            
+            print(f"{prefix}{connector}📂 {item.name}/ ({subitem_count} items)")
+            
+            # Recurse into subdirectory
+            new_prefix = prefix + ("    " if is_last_item else "│   ")
+            _print_tree(item, new_prefix, is_last_item, max_depth, current_depth + 1)
 
 
 def cmd_status(args):

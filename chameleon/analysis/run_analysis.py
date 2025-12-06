@@ -296,6 +296,34 @@ def run_full_analysis(
     except Exception as e:
         print(f"   ⚠️ Could not generate executive report: {e}")
     
+    # Step 7: Run Synergy Analysis (Advanced)
+    print("\n" + "-" * 40)
+    print("STEP 7: Running Synergy Analysis (Advanced)")
+    print("-" * 40)
+    
+    try:
+        from .synergy_engine import run_synergy_analysis
+        
+        synergy_dir = results_dir / "synergy_analysis"
+        print(f"   Output: {synergy_dir}")
+        
+        synergy_result = run_synergy_analysis(
+            input_csv=csv_path,
+            output_dir=synergy_dir,
+            validated_only=False,
+            n_bootstrap=500,
+            verbose=True
+        )
+        
+        if synergy_result.get("status") == "complete":
+            generated_files.extend([str(synergy_dir / f) for f in synergy_result.get("files_generated", [])])
+            print(f"   ✅ Synergy analysis complete!")
+            print(f"   📄 Executive Summary: {synergy_dir / '11_executive_summary.md'}")
+    except Exception as e:
+        print(f"   ⚠️ Could not run synergy analysis: {e}")
+        import traceback
+        traceback.print_exc()
+    
     # Final Summary
     print("\n" + "═" * 60)
     print("📊 ANALYSIS COMPLETE")

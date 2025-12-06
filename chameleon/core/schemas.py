@@ -56,11 +56,11 @@ class DistortionEngineConfig(BaseModel):
     """
     
     # Engine type
-    engine_type: DistortionEngineType = Field(default=DistortionEngineType.LOCAL)
+    engine_type: DistortionEngineType = Field(default=DistortionEngineType.API)
     
     # Model identification
     vendor: str = Field(default="mistral")  # openai, anthropic, mistral, google, huggingface, local
-    model_name: str = Field(default="mistral-7b-instruct")
+    model_name: str = Field(default="mistral-large-latest")
     
     # For local models
     model_path: Optional[str] = Field(default=None)  # Path to downloaded model
