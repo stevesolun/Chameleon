@@ -1,35 +1,13 @@
-"""Analysis module - Metrics, statistical tests, and visualizations."""
+"""
+Chameleon Analysis Module
+=========================
+Analysis engine for LLM robustness evaluation.
 
-from chameleon.analysis.metrics import (
-    calculate_accuracy,
-    calculate_accuracy_by_group,
-    calculate_degradation,
-)
-from chameleon.analysis.mcnemar import (
-    mcnemar_test,
-    analyze_distortion_significance,
-    analyze_subject_significance,
-)
-from chameleon.analysis.visualizations import (
-    create_degradation_heatmap,
-    create_accuracy_plots,
-    create_key_insights_summary,
-)
-from chameleon.analysis.run_analysis import run_full_analysis
-from chameleon.analysis.synergy_engine import run_synergy_analysis
+Main entry point: run_analysis()
+"""
+
+from chameleon.analysis.analysis import run_analysis
 
 __all__ = [
-    "calculate_accuracy",
-    "calculate_accuracy_by_group",
-    "calculate_degradation",
-    "mcnemar_test",
-    "analyze_distortion_significance",
-    "analyze_subject_significance",
-    "create_degradation_heatmap",
-    "create_accuracy_plots",
-    "create_key_insights_summary",
-    "run_full_analysis",
-    "run_synergy_analysis",
+    "run_analysis",
 ]
-
-

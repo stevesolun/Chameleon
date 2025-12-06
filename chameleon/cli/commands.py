@@ -1211,9 +1211,9 @@ def cmd_analyze(args):
         return 1
     
     try:
-        from chameleon.analysis import run_full_analysis
+        from chameleon.analysis import run_analysis
         
-        result = run_full_analysis(project_name, str(projects_dir))
+        result = run_analysis(project_name, str(projects_dir))
         
         return 0 if result.get("status") == "complete" else 1
         

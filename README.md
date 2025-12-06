@@ -166,17 +166,23 @@ Chameleon/
 
 ## 📈 Analysis Output
 
-After running `python cli.py analyze --project YourProject`, all outputs are saved to `Projects/YourProject/results/analysis/`:
+After running `python cli.py analyze --project YourProject`, all outputs are saved to `Projects/YourProject/results/analysis/` (~23 files):
 
-### 📊 Core Metrics
+### 📊 Core Metrics (Data + Charts)
 
 | File | Description | Key Insight |
 |------|-------------|-------------|
-| `01_accuracy_by_miu.csv/png` | Accuracy curve across μ levels | How quickly does accuracy degrade? |
-| `02_accuracy_by_subject_miu.csv` | Per-subject breakdown | Which subjects are most vulnerable? |
+| `01_accuracy_by_miu.csv` | Accuracy data by μ level | Raw numbers for each distortion level |
+| `01_accuracy_by_miu.png` | 📈 **Line chart**: accuracy vs distortion | Visualize degradation curve |
+| `02_accuracy_by_subject_miu.csv` | Per-subject accuracy data | Which subjects are most vulnerable? |
+| `02_subject_ranking.png` | 📊 **Bar chart**: subject performance | Rank subjects by baseline accuracy |
+| `02_subject_miu_heatmap.png` | 🔥 **Heatmap**: absolute accuracy (Subject × μ) | See accuracy patterns |
+| `02_degradation_heatmap.png` | 🔥 **Heatmap**: % degradation from baseline | Identify vulnerable subjects |
 | `03_chameleon_robustness_index.csv` | CRI scores (global + per-subject) | Single metric for model ranking |
-| `04_elasticity.csv/png` | Linear regression of degradation | Quantify fragility with slope |
-| `05_model_comparison.csv/png` | Head-to-head comparison table | Compare all metrics in one view |
+| `04_elasticity.csv` | Degradation slope data | Quantify fragility numerically |
+| `04_elasticity.png` | 📈 **Scatter + regression**: degradation rate | Visualize slope |
+| `05_model_comparison.csv` | Head-to-head comparison table | Compare all metrics |
+| `05_model_comparison.png` | 📊 **Scatter plot**: CRI vs accuracy | Compare models visually |
 
 ### 🔬 Error Analysis
 
@@ -190,17 +196,20 @@ After running `python cli.py analyze --project YourProject`, all outputs are sav
 | File | Description | Key Insight |
 |------|-------------|-------------|
 | `08_bootstrap_intervals.csv` | 95% confidence intervals (500 samples) | Are differences statistically significant? |
-| `mcnemar_distortion_results.csv` | McNemar's test: μ=0 vs μ>0 | Paired significance testing |
-| `mcnemar_subject_results.csv` | Per-subject McNemar tests | Subject-specific significance |
-| `mcnemar_pairwise_results.csv` | Adjacent μ level comparisons | Which μ jumps matter most? |
+| `11_mcnemar_distortion.csv` | McNemar's test: μ=0 vs each μ>0 | Paired significance testing |
+| `11_mcnemar_distortion.png` | 📊 **Bar chart**: baseline vs distorted (* = p<0.05) | Visualize significant differences |
+| `12_mcnemar_subject.csv` | Per-subject McNemar tests | Subject-specific significance |
+| `12_mcnemar_subject.png` | 📊 **Bar chart**: per-subject significance | Which subjects show real degradation? |
 
 ### 🎯 Advanced Analysis
 
 | File | Description | Key Insight |
 |------|-------------|-------------|
-| `09_delta_accuracy_heatmap.csv/png` | Subject × μ degradation matrix | Visual: Red = high degradation |
+| `09_delta_accuracy_heatmap.csv` | Subject × μ degradation matrix (data) | Raw delta values |
+| `09_delta_accuracy_heatmap.png` | 🔥 **Heatmap**: change from baseline | Visual: Red = high degradation |
 | `10_question_difficulty_tiers.json` | Easy/Medium/Hard/Chameleon Breakers | Find pattern-matching evidence |
-| `11_executive_summary.md` | **START HERE** - Full findings report | Comprehensive interpretation |
+| `13_key_insights.png` | 📊 **4-panel summary**: curve + bars + pie + stats | Quick visual overview |
+| `EXECUTIVE_REPORT.md` | 📄 **START HERE** - Full findings report | Comprehensive interpretation |
 
 ---
 
@@ -232,6 +241,26 @@ Linear regression of accuracy vs μ:
 > **Chameleon Breakers** are the most important finding - they reveal questions where the model appears to understand at baseline but fails catastrophically under paraphrasing, indicating reliance on lexical patterns rather than semantic comprehension.
 
 ## 🐳 Docker Usage
+
+### Option 1: Docker Compose (Recommended)
+
+```bash
+# Set your API keys in .env or export them
+export MISTRAL_API_KEY="your-mistral-key"
+export OPENAI_API_KEY="your-openai-key"
+
+# Build and run
+docker-compose build
+docker-compose run chameleon python cli.py init
+docker-compose run chameleon python cli.py distort -p MyProject
+docker-compose run chameleon python cli.py evaluate -p MyProject
+docker-compose run chameleon python cli.py analyze -p MyProject
+
+# Or run analysis only (no API keys needed)
+PROJECT=MyProject docker-compose run analyze
+```
+
+### Option 2: Docker Direct
 
 ```bash
 # Build
